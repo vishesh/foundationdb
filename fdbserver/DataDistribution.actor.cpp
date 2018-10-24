@@ -1235,7 +1235,7 @@ struct DDTeamCollection : ReferenceCounted<DDTeamCollection> {
 		}
 		allServers.push_back( newServer.id() );
 
-		TraceEvent("AddedStorageServer", masterId).detail("ServerID", newServer.id()).detail("ProcessClass", processClass.toString()).detail("WaitFailureToken", newServer.waitFailure.getEndpoint().token).detail("Address", newServer.waitFailure.getEndpoint().address);
+		TraceEvent("AddedStorageServer", masterId).detail("ServerID", newServer.id()).detail("ProcessClass", processClass.toString()).detail("WaitFailureToken", newServer.waitFailure.getEndpoint().token).detail("Address", newServer.waitFailure.getEndpoint().address[0]);
 		auto &r = server_info[newServer.id()] = Reference<TCServerInfo>( new TCServerInfo( newServer, processClass, includedDCs.empty() || std::find(includedDCs.begin(), includedDCs.end(), newServer.locality.dcId()) != includedDCs.end(), storageServerSet ) );
 		r->tracker = storageServerTracker( this, cx, r.getPtr(), &server_status, lock, masterId, &server_info, serverChanges, errorOut, addedVersion );
 		restartTeamBuilder.trigger();
@@ -1891,7 +1891,7 @@ ACTOR Future<Void> storageServerTracker(
 					return Void();
 				}
 				when( std::pair<StorageServerInterface, ProcessClass> newInterface = wait( interfaceChanged ) ) {
-					bool restartRecruiting =  newInterface.first.waitFailure.getEndpoint().address != server->lastKnownInterface.waitFailure.getEndpoint().address;
+					bool restartRecruiting =  newInterface.first.waitFailure.getEndpoint().address[0] != server->lastKnownInterface.waitFailure.getEndpoint().address[0];
 					bool localityChanged = server->lastKnownInterface.locality != newInterface.first.locality;
 					TraceEvent("StorageServerInterfaceChanged", masterId).detail("ServerID", server->id)
 						.detail("NewWaitFailureToken", newInterface.first.waitFailure.getEndpoint().token)
