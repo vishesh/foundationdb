@@ -97,8 +97,8 @@ public:
 	// Starts a server listening on the given listenAddress, and sets publicAddress to be the public
 	// address of this server.  Returns only errors.
 
-	NetworkAddress getLocalAddress();
-	// Returns the NetworkAddress that would be assigned by addEndpoint (the public address)
+	NetworkAddress getLocalAddress() const;
+	// Returns first local NetworkAddress.
 
 	std::map<NetworkAddress, std::pair<uint64_t, double>>* getIncompatiblePeers();
 	// Returns the same of all peers that have attempted to connect, but have incompatible protocol versions
@@ -145,13 +145,13 @@ public:
 	}
 
 private:
-	class TransportData* self;
+	class TransportData* self_;
 
 	void loadedEndpoint(Endpoint&);
 };
 
 inline bool Endpoint::isLocal() const { 
-	return address[0] == FlowTransport::transport().getLocalAddress();
+	return address.size() > 0 && address[0] == FlowTransport::transport().getLocalAddress();
 }
 
 #endif

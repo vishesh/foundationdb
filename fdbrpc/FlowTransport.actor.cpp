@@ -162,10 +162,20 @@ public:
 	}
 
 	struct Peer* getPeer( NetworkAddress const& address, bool openConnection = true );
-	
-	NetworkAddress localAddress;
+
+	// TODO (Vishesh) : Now make it make sense!
+	const NetworkAddress& getFirstLocalAddress() const {
+		return localListeners.begin()->first;
+	}
+
+	// Returns a vector of NetworkAddresses we are listening to.
+	NetworkAddressList getLocalAddresses() const;
+
+	// Returns true if given network address 'address' is one of the address we are listening on.
+	bool isLocalAddress(const NetworkAddress& address) const;
+
+	std::map<NetworkAddress, Future<Void>> localListeners;
 	std::map<NetworkAddress, struct Peer*> peers;
-	Future<Void> listen;
 	bool warnAlwaysForLargePacket;
 
 	// These declarations must be in exactly this order
@@ -248,13 +258,14 @@ struct Peer : NonCopyable {
 	void prependConnectPacket() {
 		// Send the ConnectPacket expected at the beginning of a new connection
 		ConnectPacket pkt;
-		if (transport->localAddress.isTLS() != destination.isTLS()) {
+		const NetworkAddress& localAddress = transport->getFirstLocalAddress();
+		if (localAddress.isTLS() != destination.isTLS()) {
 			pkt.canonicalRemotePort = 0;   // a "mixed" TLS/non-TLS connection is like a client/server connection - there's no way to reverse it
 			pkt.canonicalRemoteIp = 0;
 		}
 		else {
-			pkt.canonicalRemotePort = transport->localAddress.port;
-			pkt.canonicalRemoteIp = transport->localAddress.ip;
+			pkt.canonicalRemotePort = localAddress.port;
+			pkt.canonicalRemoteIp = localAddress.ip;
 		}
 		pkt.connectPacketLength = sizeof(pkt)-sizeof(pkt.connectPacketLength);
 		pkt.protocolVersion = currentProtocolVersion;
@@ -282,7 +293,7 @@ struct Peer : NonCopyable {
 		// In case two processes are trying to connect to each other simultaneously, the process with the larger canonical NetworkAddress
 		// gets to keep its outgoing connection.
 		if ( !destination.isPublic() && !outgoingConnectionIdle ) throw address_in_use();
-		if ( !destination.isPublic() || outgoingConnectionIdle || destination > transport->localAddress ) {
+		if ( !destination.isPublic() || outgoingConnectionIdle || destination > transport->getFirstLocalAddress() ) { //TODO (Vishesh): Last condition.
 			// Keep the new connection
 			TraceEvent("IncomingConnection", conn->getDebugID())
 				.suppressFor(1.0)
@@ -474,9 +485,9 @@ ACTOR static void deliver( TransportData* self, Endpoint destination, ArenaReade
 	} else if (destination.token.first() & TOKEN_STREAM_FLAG) {
 		// We don't have the (stream) endpoint 'token', notify the remote machine
 		if (destination.token.first() != -1)
-			sendPacket( self, 
-				SerializeSource<Endpoint>( Endpoint( {self->localAddress}, destination.token ) ),
-				Endpoint( {destination.address[0]}, WLTOKEN_ENDPOINT_NOT_FOUND),
+			sendPacket( self,
+				SerializeSource<Endpoint>( Endpoint( self->getLocalAddresses(), destination.token ) ),
+				Endpoint( destination.address, WLTOKEN_ENDPOINT_NOT_FOUND),
 				false, true );
 	}
 
@@ -491,7 +502,7 @@ static void scanPackets( TransportData* transport, uint8_t*& unprocessed_begin, 
 	uint8_t* p = unprocessed_begin;
 
 	bool checksumEnabled = true;
-	if (transport->localAddress.isTLS() || peerAddress.isTLS()) {
+	if (transport->getFirstLocalAddress().isTLS() || peerAddress.isTLS()) {
 		checksumEnabled = false;
 	}
 
@@ -599,7 +610,7 @@ ACTOR static Future<Void> connectionReader(
 	state uint64_t peerProtocolVersion = 0;
 
 	peerAddress = conn->getPeerAddress();
-	if (peer == nullptr) { 
+	if (peer == nullptr) {
 		ASSERT( !peerAddress.isPublic() );
 	}
 	try {
@@ -623,23 +634,23 @@ ACTOR static Future<Void> connectionReader(
 				if (!readBytes) break;
 				state bool readWillBlock = readBytes != readAllBytes;
 				unprocessed_end += readBytes;
-			
+
 				if (expectConnectPacket && unprocessed_end-unprocessed_begin>=CONNECT_PACKET_V0_SIZE) {
 					// At the beginning of a connection, we expect to receive a packet containing the protocol version and the listening port of the remote process
 					ConnectPacket* p = (ConnectPacket*)unprocessed_begin;
-				
+
 					uint64_t connectionId = 0;
 					int32_t connectPacketSize = p->minimumSize();
 					if ( unprocessed_end-unprocessed_begin >= connectPacketSize ) {
 						if(p->protocolVersion >= 0x0FDB00A444020001) {
 							connectionId = p->connectionId;
 						}
-						
+
 						if( (p->protocolVersion & compatibleProtocolVersionMask) != (currentProtocolVersion & compatibleProtocolVersionMask) ) {
 							incompatibleProtocolVersionNewer = p->protocolVersion > currentProtocolVersion;
 							NetworkAddress addr = p->canonicalRemotePort ? NetworkAddress( p->canonicalRemoteIp, p->canonicalRemotePort ) : conn->getPeerAddress();
 							if(connectionId != 1) addr.port = 0;
-						
+
 							if(!transport->multiVersionConnections.count(connectionId)) {
 								if(now() - transport->lastIncompatibleMessage > FLOW_KNOBS->CONNECTION_REJECTED_MESSAGE_DELAY) {
 									TraceEvent(SevWarn, "ConnectionRejected", conn->getDebugID())
@@ -783,6 +794,18 @@ Peer* TransportData::getPeer( NetworkAddress const& address, bool openConnection
 	return newPeer;
 }
 
+ NetworkAddressList TransportData::getLocalAddresses() const {
+	 NetworkAddressList addresses;
+	 for (const auto& addr_listener : localListeners) {
+		 addresses.push_back(addr_listener.first);
+	 }
+	 return addresses;
+}
+
+bool TransportData::isLocalAddress(const NetworkAddress& address) const {
+	return localListeners.find(address) != localListeners.end();
+}
+
 ACTOR static Future<Void> multiVersionCleanupWorker( TransportData* self ) {
 	loop {
 		wait(delay(FLOW_KNOBS->CONNECTION_CLEANUP_DELAY));
@@ -804,33 +827,42 @@ ACTOR static Future<Void> multiVersionCleanupWorker( TransportData* self ) {
 	}
 }
 
-FlowTransport::FlowTransport( uint64_t transportId ) : self(new TransportData(transportId)) {
-	self->multiVersionCleanup = multiVersionCleanupWorker(self);
+FlowTransport::FlowTransport( uint64_t transportId ) : self_(new TransportData(transportId)) {
+	self_->multiVersionCleanup = multiVersionCleanupWorker(self_);
 }
 
-FlowTransport::~FlowTransport() { delete self; }
+FlowTransport::~FlowTransport() { delete self_; }
 
-void FlowTransport::initMetrics() { self->initMetrics(); }
+void FlowTransport::initMetrics() { self_->initMetrics(); }
 
-NetworkAddress FlowTransport::getLocalAddress() { return self->localAddress; }
+NetworkAddress FlowTransport::getLocalAddress() const {
+	//TODO (Vishesh) : Consider all addresses.
+	const NetworkAddressList& addresses = self_->getLocalAddresses();
+	if (addresses.empty()) {
+		return NetworkAddress();
+	}
+	return self_->getLocalAddresses()[0];
+}
 
-std::map<NetworkAddress, std::pair<uint64_t, double>>* FlowTransport::getIncompatiblePeers() { 
-	for(auto it = self->incompatiblePeers.begin(); it != self->incompatiblePeers.end();) {
-		if( self->multiVersionConnections.count(it->second.first) ) {
-			it = self->incompatiblePeers.erase(it);
+std::map<NetworkAddress, std::pair<uint64_t, double>>* FlowTransport::getIncompatiblePeers() {
+	for(auto it = self_->incompatiblePeers.begin(); it != self_->incompatiblePeers.end();) {
+		if( self_->multiVersionConnections.count(it->second.first) ) {
+			it = self_->incompatiblePeers.erase(it);
 		} else {
 			it++;
 		}
 	}
-	return &self->incompatiblePeers; 
+	return &self_->incompatiblePeers;
 }
 
 Future<Void> FlowTransport::bind( NetworkAddress publicAddress, NetworkAddress listenAddress ) {
 	ASSERT( publicAddress.isPublic() );
-	self->localAddress = publicAddress;
+	ASSERT( self_->localListeners.find(publicAddress) == self_->localListeners.end() );
 	TraceEvent("Binding").detail("PublicAddress", publicAddress).detail("ListenAddress", listenAddress);
-	self->listen = listen( self, listenAddress );
-	return self->listen;
+
+	Future<Void> listenF = listen( self_, listenAddress );
+	self_->localListeners[publicAddress] = listenF;
+	return listenF;
 }
 
 void FlowTransport::loadedEndpoint( Endpoint& endpoint ) {
@@ -842,7 +874,7 @@ void FlowTransport::loadedEndpoint( Endpoint& endpoint ) {
 
 void FlowTransport::addPeerReference( const Endpoint& endpoint, NetworkMessageReceiver* receiver ) {
 	if (!receiver->isStream() || !endpoint.address[0].isValid()) return;
-	Peer* peer = self->getPeer(endpoint.address[0]);
+	Peer* peer = self_->getPeer(endpoint.address[0]);
 	if(peer->peerReferences == -1) {
 		peer->peerReferences = 1;
 	} else {
@@ -852,7 +884,7 @@ void FlowTransport::addPeerReference( const Endpoint& endpoint, NetworkMessageRe
 
 void FlowTransport::removePeerReference( const Endpoint& endpoint, NetworkMessageReceiver* receiver ) {
 	if (!receiver->isStream() || !endpoint.address[0].isValid()) return;
-	Peer* peer = self->getPeer(endpoint.address[0], false);
+	Peer* peer = self_->getPeer(endpoint.address[0], false);
 	if(peer) {
 		peer->peerReferences--;
 		if(peer->peerReferences < 0) {
@@ -867,29 +899,29 @@ void FlowTransport::removePeerReference( const Endpoint& endpoint, NetworkMessag
 void FlowTransport::addEndpoint( Endpoint& endpoint, NetworkMessageReceiver* receiver, uint32_t taskID ) {
 	endpoint.token = g_random->randomUniqueID();
 	if (receiver->isStream()) {
-		endpoint.address = {getLocalAddress()};
+		endpoint.address = self_->getLocalAddresses();
 		endpoint.token = UID( endpoint.token.first() | TOKEN_STREAM_FLAG, endpoint.token.second() );
 	} else {
 		endpoint.address = {NetworkAddress()};
 		endpoint.token = UID( endpoint.token.first() & ~TOKEN_STREAM_FLAG, endpoint.token.second() );
 	}
-	self->endpoints.insert( receiver, endpoint.token, taskID );
+	self_->endpoints.insert( receiver, endpoint.token, taskID );
 }
 
 void FlowTransport::removeEndpoint( const Endpoint& endpoint, NetworkMessageReceiver* receiver ) {
-	self->endpoints.remove(endpoint.token, receiver);
+	self_->endpoints.remove(endpoint.token, receiver);
 }
 
 void FlowTransport::addWellKnownEndpoint( Endpoint& endpoint, NetworkMessageReceiver* receiver, uint32_t taskID ) {
-	endpoint.address = {getLocalAddress()};
+	endpoint.address = self_->getLocalAddresses();
 	ASSERT( ((endpoint.token.first() & TOKEN_STREAM_FLAG)!=0) == receiver->isStream() );
 	Endpoint::Token otoken = endpoint.token;
-	self->endpoints.insert( receiver, endpoint.token, taskID );
+	self_->endpoints.insert( receiver, endpoint.token, taskID );
 	ASSERT( endpoint.token == otoken );
 }
 
 static PacketID sendPacket( TransportData* self, ISerializeSource const& what, const Endpoint& destination, bool reliable, bool openConnection ) {
-	if (destination.address[0] == self->localAddress) {
+	if (self->isLocalAddress(destination.address[0])) {
 		TEST(true); // "Loopback" delivery
 		// SOMEDAY: Would it be better to avoid (de)serialization by doing this check in flow?
 
@@ -905,7 +937,7 @@ static PacketID sendPacket( TransportData* self, ISerializeSource const& what, c
 		return (PacketID)NULL;
 	} else {
 		bool checksumEnabled = true;
-		if (self->localAddress.isTLS() || destination.address[0].isTLS()) {
+		if (self->getFirstLocalAddress().isTLS() || destination.address[0].isTLS()) {
 			checksumEnabled = false;
 		}
 
@@ -1002,7 +1034,7 @@ static PacketID sendPacket( TransportData* self, ISerializeSource const& what, c
 }
 
 PacketID FlowTransport::sendReliable( ISerializeSource const& what, const Endpoint& destination ) {
-	return sendPacket( self, what, destination, true, true );
+	return sendPacket( self_, what, destination, true, true );
 }
 
 void FlowTransport::cancelReliable( PacketID pid ) {
@@ -1012,7 +1044,7 @@ void FlowTransport::cancelReliable( PacketID pid ) {
 }
 
 void FlowTransport::sendUnreliable( ISerializeSource const& what, const Endpoint& destination, bool openConnection ) {
-	sendPacket( self, what, destination, false, openConnection );
+	sendPacket( self_, what, destination, false, openConnection );
 }
 
 int FlowTransport::getEndpointCount() { 
@@ -1020,7 +1052,7 @@ int FlowTransport::getEndpointCount() {
 }
 
 bool FlowTransport::incompatibleOutgoingConnectionsPresent() {
-	return self->numIncompatibleConnections;
+	return self_->numIncompatibleConnections;
 }
 
 void FlowTransport::createInstance( uint64_t transportId )
