@@ -699,7 +699,7 @@ ACTOR static Future<Void> connectionReader(
 								peer->transport->numIncompatibleConnections++;
 								incompatiblePeerCounted = true;
 							}
-							ASSERT( p->canonicalRemotePort == peerAddress.port );
+							// ASSERT( p->canonicalRemotePort == peerAddress.port );
 						} else {
 							if (p->canonicalRemotePort) {
 								peerAddress = NetworkAddress( p->canonicalRemoteIp, p->canonicalRemotePort, true, peerAddress.isTLS() );
@@ -794,7 +794,7 @@ Peer* TransportData::getPeer( NetworkAddress const& address, bool openConnection
 	return newPeer;
 }
 
- NetworkAddressList TransportData::getLocalAddresses() const {
+NetworkAddressList TransportData::getLocalAddresses() const {
 	 NetworkAddressList addresses;
 	 for (const auto& addr_listener : localListeners) {
 		 addresses.push_back(addr_listener.first);
@@ -874,24 +874,31 @@ void FlowTransport::loadedEndpoint( Endpoint& endpoint ) {
 
 void FlowTransport::addPeerReference( const Endpoint& endpoint, NetworkMessageReceiver* receiver ) {
 	if (!receiver->isStream() || !endpoint.address[0].isValid()) return;
-	Peer* peer = self_->getPeer(endpoint.address[0]);
-	if(peer->peerReferences == -1) {
-		peer->peerReferences = 1;
-	} else {
-		peer->peerReferences++;
+	for (const NetworkAddress& address : endpoint.address) {
+		Peer* peer = self_->getPeer(address);
+		if(peer->peerReferences == -1) {
+			peer->peerReferences = 1;
+		} else {
+			peer->peerReferences++;
+		}
 	}
 }
 
 void FlowTransport::removePeerReference( const Endpoint& endpoint, NetworkMessageReceiver* receiver ) {
 	if (!receiver->isStream() || !endpoint.address[0].isValid()) return;
-	Peer* peer = self_->getPeer(endpoint.address[0], false);
-	if(peer) {
-		peer->peerReferences--;
-		if(peer->peerReferences < 0) {
-			TraceEvent(SevError, "InvalidPeerReferences").detail("References", peer->peerReferences).detail("Address", endpoint.address[0]).detail("Token", endpoint.token);
-		}
-		if(peer->peerReferences == 0 && peer->reliable.empty() && peer->unsent.empty()) {
-			peer->incompatibleDataRead.trigger();
+	for (const NetworkAddress& address : endpoint.address) {
+		Peer* peer = self_->getPeer(address, false);
+		if(peer) {
+			peer->peerReferences--;
+			if(peer->peerReferences < 0) {
+				TraceEvent(SevError, "InvalidPeerReferences")
+					.detail("References", peer->peerReferences)
+					.detail("Address", address)
+					.detail("Token", endpoint.token);
+			}
+			if(peer->peerReferences == 0 && peer->reliable.empty() && peer->unsent.empty()) {
+				peer->incompatibleDataRead.trigger();
+			}
 		}
 	}
 }
@@ -943,7 +950,8 @@ static PacketID sendPacket( TransportData* self, ISerializeSource const& what, c
 
 		++self->countPacketsGenerated;
 
-		Peer* peer = self->getPeer(destination.address[0], openConnection);
+		const NetworkAddress& randDestAddress = destination.address[g_random->randomInt(0, destination.address.size())];
+		Peer* peer = self->getPeer(randDestAddress, openConnection);
 
 		// If there isn't an open connection, a public address, or the peer isn't compatible, we can't send
 		if (!peer || (peer->outgoingConnectionIdle && !destination.address[0].isPublic()) || (peer->incompatibleProtocolVersionNewer && destination.token != WLTOKEN_PING_PACKET)) {
