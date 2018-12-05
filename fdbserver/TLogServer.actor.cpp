@@ -1279,6 +1279,7 @@ ACTOR Future<Void> rejoinMasters( TLogData* self, TLogInterface tli, DBRecoveryC
 	state UID lastMasterID(0,0);
 	loop {
 		auto const& inf = self->dbInfo->get();
+		printf("INFO: %p, %p, %p\n", &self->dbInfo, self->dbInfo.getPtr(), &inf);
 		bool isDisplaced = !std::count( inf.priorCommittedLogServers.begin(), inf.priorCommittedLogServers.end(), tli.id() );
 		if(isPrimary) {
 			isDisplaced = isDisplaced && inf.recoveryCount >= recoveryCount && inf.recoveryState != RecoveryState::UNINITIALIZED;
@@ -1316,6 +1317,7 @@ ACTOR Future<Void> rejoinMasters( TLogData* self, TLogInterface tli, DBRecoveryC
 				// The TLogRejoinRequest is needed to establish communications with a new master, which doesn't have our TLogInterface
 				TLogRejoinRequest req(tli);
 				TraceEvent("TLogRejoining", self->dbgid).detail("Master", self->dbInfo->get().master.id());
+				printf("Rejoining\n");
 				choose {
 					when ( bool success = wait( brokenPromiseToNever( self->dbInfo->get().master.tlogRejoin.getReply( req ) ) ) ) {
 						if (success)
@@ -1324,7 +1326,10 @@ ACTOR Future<Void> rejoinMasters( TLogData* self, TLogInterface tli, DBRecoveryC
 					when ( wait( self->dbInfo->onChange() ) ) { }
 				}
 			} else {
+				printf("BEFORE INFO: %p, %p, %p\n", &self->dbInfo, self->dbInfo.getPtr(), &self->dbInfo->get());
 				wait( self->dbInfo->onChange() );
+				printf("AFTER INFO: %p, %p, %p\n", &self->dbInfo, self->dbInfo.getPtr(), &self->dbInfo->get());
+				printf("Changed 2\n");
 			}
 		} else {
 			wait( registerWithMaster || self->dbInfo->onChange() );

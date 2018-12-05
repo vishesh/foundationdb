@@ -78,10 +78,10 @@ ACTORCOMPILER := bin/actorcompiler.exe
 # UNSTRIPPED := 1
 
 # Normal optimization level
-CFLAGS += -O2
+# CFLAGS += -O2
 
 # Or turn off optimization entirely
-# CFLAGS += -O0
+CFLAGS += -O0
 
 # Debugging symbols are a good thing (and harmless, since we keep them
 # in external debug files)

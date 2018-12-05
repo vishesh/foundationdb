@@ -198,6 +198,7 @@ ACTOR Future<ISimulator::KillType> simulatedFDBDRebooter(
 		bool sslEnabled,
 		Reference<TLSOptions> tlsOptions,
 		uint16_t port,
+		uint16_t listenPerProcess,
 		LocalityData localities,
 		ProcessClass processClass,
 		std::string* dataFolder,
@@ -211,6 +212,7 @@ ACTOR Future<ISimulator::KillType> simulatedFDBDRebooter(
 	state UID randomId = g_nondeterministic_random->randomUniqueID();
 	state int cycles = 0;
 
+
 	loop {
 		auto waitTime = SERVER_KNOBS->MIN_REBOOT_TIME + (SERVER_KNOBS->MAX_REBOOT_TIME - SERVER_KNOBS->MIN_REBOOT_TIME) * g_random->random01();
 		cycles ++;
@@ -221,7 +223,7 @@ ACTOR Future<ISimulator::KillType> simulatedFDBDRebooter(
 
 		wait( delay( waitTime ) );
 
-		state ISimulator::ProcessInfo *process =  g_simulator.newProcess( "Server", ip, port, localities, processClass, dataFolder->c_str(), coordFolder->c_str() );
+		state ISimulator::ProcessInfo *process =  g_simulator.newProcess( "Server", ip, port, listenPerProcess, localities, processClass, dataFolder->c_str(), coordFolder->c_str() );
 		wait( g_simulator.onProcess(process, TaskDefaultYield) );	// Now switch execution to the process on which we will run
 		state Future<ISimulator::KillType> onShutdown = process->onShutdown();
 
@@ -251,21 +253,31 @@ ACTOR Future<ISimulator::KillType> simulatedFDBDRebooter(
 				if (sslEnabled) {
 					tlsOptions->register_network();
 				}
-				NetworkAddress n(ip, port, true, sslEnabled);
-				Future<Void> listen = FlowTransport::transport().bind( n, n );
+
+				state vector<Future<Void>> futures;
+				for (int listenPort = port; listenPort < port + listenPerProcess; ++listenPort) {
+					NetworkAddress n(ip, listenPort, true, sslEnabled);
+					futures.push_back(FlowTransport::transport().bind( n, n ));
+				}
 				Future<Void> fd = fdbd( connFile, localities, processClass, *dataFolder, *coordFolder, 500e6, "", "");
 				Future<Void> backup = runBackupAgents ? runBackup(connFile) : Future<Void>(Never());
 				Future<Void> dr = runBackupAgents ? runDr(connFile) : Future<Void>(Never());
 
-				wait(listen || fd || success(onShutdown) || backup || dr);
+				futures.push_back(fd);
+				futures.push_back(backup);
+				futures.push_back(dr);
+				wait (waitForAny(futures));
+				printf("Finished!\n");
 			} catch (Error& e) {
 				// If in simulation, if we make it here with an error other than io_timeout but enASIOTimedOut is set then somewhere an io_timeout was converted to a different error.
 				if(g_network->isSimulated() && e.code() != error_code_io_timeout && (bool)g_network->global(INetwork::enASIOTimedOut))
 					TraceEvent(SevError, "IOTimeoutErrorSuppressed").detail("ErrorCode", e.code()).detail("RandomId", randomId).backtrace();
 
 				if (onShutdown.isReady() && onShutdown.isError()) throw onShutdown.getError();
-				if(e.code() != error_code_actor_cancelled)
+				if(e.code() != error_code_actor_cancelled) {
+					TraceEvent(SevError, "SimulatedFFBDTerminated").backtrace();
 					printf("SimulatedFDBDTerminated: %s\n", e.what());
+				}
 				ASSERT( destructed || g_simulator.getCurrentProcess() == process ); // simulatedFDBD catch called on different process
 				TraceEvent(e.code() == error_code_actor_cancelled || e.code() == error_code_file_not_found || destructed ? SevInfo : SevError, "SimulatedFDBDTerminated").error(e, true).detailext("ZoneId", localities.zoneId());
 			}
@@ -406,7 +418,7 @@ ACTOR Future<Void> simulatedMachine(
 			for( int i = 0; i < ips.size(); i++ ) {
 				std::string path = joinPath(myFolders[i], "fdb.cluster");
 				Reference<ClusterConnectionFile> clusterFile(useSeedFile ? new ClusterConnectionFile(path, connStr.toString()) : new ClusterConnectionFile(path));
-				processes.push_back(simulatedFDBDRebooter(clusterFile, ips[i], sslEnabled, tlsOptions, i + 1, localities, processClass, &myFolders[i], &coordFolders[i], baseFolder, connStr, useSeedFile, runBackupAgents));
+				processes.push_back(simulatedFDBDRebooter(clusterFile, ips[i], sslEnabled, tlsOptions, i*1 + 1, 1, localities, processClass, &myFolders[i], &coordFolders[i], baseFolder, connStr, useSeedFile, runBackupAgents));
 				TraceEvent("SimulatedMachineProcess", randomId).detail("Address", NetworkAddress(ips[i], i+1, true, false)).detailext("ZoneId", localities.zoneId()).detailext("DataHall", localities.dataHallId()).detail("Folder", myFolders[i]);
 			}
 
@@ -1204,22 +1216,6 @@ void setupSimulatedSystem( vector<Future<Void>> *systemActors, std::string baseF
 			baseFolder, false, i == useSeedForMachine, false ),
 			"SimulatedTesterMachine") );
 	}
-
-	/*int testerCount = g_random->randomInt(4, 9);
-	for(int i=0; i<testerCount; i++)
-		g_simulator.asNewProcess("TestWorker", 0x03040301 + i, LocalityData(g_random->randomUniqueID().toString(), Optional<Standalone<StringRef>>()), [&] {
-			vector<Future<Void>> v;
-
-			Reference<AsyncVar<ClusterControllerFullInterface>> cc( new AsyncVar<ClusterControllerFullInterface> );
-			Reference<AsyncVar<ClusterInterface>> ci( new AsyncVar<ClusterInterface> );
-			v.push_back( monitorLeader( coordinators, cc ) );
-			v.push_back( extractClusterInterface(cc,ci) );
-			v.push_back( failureMonitorClient( ci ) );
-			v.push_back( testerServer( cc ) );
-			systemActors->push_back( waitForAll(v) );
-		});*/
-
-
 	*pStartingConfiguration = startingConfigString;
 
 	// save some state that we only need when restarting the simulator.
@@ -1283,7 +1279,7 @@ ACTOR void setupAndRun(std::string dataFolder, const char *testFile, bool reboot
 	checkExtraDB(testFile, extraDB, minimumReplication, minimumRegions);
 
 	wait( g_simulator.onProcess( g_simulator.newProcess(
-			"TestSystem", 0x01010101, 1, LocalityData(Optional<Standalone<StringRef>>(), Standalone<StringRef>(g_random->randomUniqueID().toString()), Optional<Standalone<StringRef>>(), Optional<Standalone<StringRef>>()), ProcessClass(ProcessClass::TesterClass, ProcessClass::CommandLineSource), "", "" ), TaskDefaultYield ) );
+		  "TestSystem", 0x01010101, 1, 1, LocalityData(Optional<Standalone<StringRef>>(), Standalone<StringRef>(g_random->randomUniqueID().toString()), Optional<Standalone<StringRef>>(), Optional<Standalone<StringRef>>()), ProcessClass(ProcessClass::TesterClass, ProcessClass::CommandLineSource), "", "" ), TaskDefaultYield ) );
 	Sim2FileSystem::newFileSystem();
 	FlowTransport::createInstance(1);
 	if (tlsOptions->enabled()) {

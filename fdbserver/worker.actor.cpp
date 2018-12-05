@@ -504,9 +504,11 @@ ACTOR Future<Void> monitorServerDBInfo( Reference<AsyncVar<Optional<ClusterContr
 		choose {
 			when( ServerDBInfo ni = wait( ccInterface->get().present() ? brokenPromiseToNever( ccInterface->get().get().getServerDBInfo.getReply( req ) ) : Never() ) ) {
 				TraceEvent("GotServerDBInfoChange").detail("ChangeID", ni.id).detail("MasterID", ni.master.id());
+				printf("GotServerDBInfoChange DBINFO: %p, %p, %p\n", &dbInfo, dbInfo.getPtr(), &dbInfo->get());
 				ServerDBInfo localInfo = ni;
 				localInfo.myLocality = locality;
 				dbInfo->set(localInfo);
+				printf("Changed DBINFO: %p, %p\n", &dbInfo->get(), dbInfo.getPtr());
 			}
 			when( wait( ccInterface->onChange() ) ) {
 				if(ccInterface->get().present())
