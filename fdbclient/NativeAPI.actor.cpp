@@ -542,6 +542,8 @@ DatabaseContext::DatabaseContext( const Error &err ) : deferredError(err), laten
 ACTOR static Future<Void> monitorClientInfo( Reference<AsyncVar<Optional<ClusterInterface>>> clusterInterface, Reference<ClusterConnectionFile> ccf, Reference<AsyncVar<ClientDBInfo>> outInfo, Reference<AsyncVar<int>> connectedCoordinatorsNumDelayed ) {
 	try {
 		state Optional<double> incorrectTime;
+		state Future<Void> leaderMon = ccf ? monitorLeader(ccf, clusterInterface) : Void();
+		state Optional<std::string> incorrectConnectionString;
 		loop {
 			OpenDatabaseRequest req;
 			req.knownClientInfoID = outInfo->get().id;
@@ -572,6 +574,27 @@ ACTOR static Future<Void> monitorClientInfo( Reference<AsyncVar<Optional<Cluster
 				when( ClientDBInfo ni = wait( clusterInterface->get().present() ? brokenPromiseToNever( clusterInterface->get().get().openDatabase.getReply( req ) ) : Never() ) ) {
 					TraceEvent("ClientInfoChange").detail("ChangeID", ni.id);
 					outInfo->set(ni);
+
+					if (ni.proxies.empty()) {
+						TraceEvent("ClientInfo_NoProxiesReturned").detail("ChangeID", ni.id);
+						continue;
+					}
+
+					vector<Future<Void>> onProxyFailureVec;
+					for (const auto& proxy : ni.proxies) {
+						onProxyFailureVec.push_back(
+						    IFailureMonitor::failureMonitor().onDisconnectOrFailure(
+						        proxy.getConsistentReadVersion.getEndpoint()) ||
+						    IFailureMonitor::failureMonitor().onDisconnectOrFailure(proxy.commit.getEndpoint()) ||
+						    IFailureMonitor::failureMonitor().onDisconnectOrFailure(
+						        proxy.getKeyServersLocations.getEndpoint()) ||
+						    IFailureMonitor::failureMonitor().onDisconnectOrFailure(
+						        proxy.getStorageServerRejoinInfo.getEndpoint()));
+					}
+
+					leaderMon = Void();
+					wait(waitForAny(onProxyFailureVec));
+					leaderMon = ccf ? monitorLeader(ccf, clusterInterface) : Void();
 				}
 				when( wait( clusterInterface->onChange() ) ) {
 					if(clusterInterface->get().present())
@@ -852,7 +875,6 @@ void Cluster::init( Reference<ClusterConnectionFile> connFile, bool startClientI
 			uncancellable( recurring( &systemMonitor, CLIENT_KNOBS->SYSTEM_MONITOR_INTERVAL, TaskFlushTrace ) );
 		}
 
-		leaderMon = monitorLeader( connFile, clusterInterface, connectedCoordinatorsNum );
 		failMon = failureMonitorClient( clusterInterface, false );
 	}
 }

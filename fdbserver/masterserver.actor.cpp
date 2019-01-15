@@ -18,6 +18,9 @@
  * limitations under the License.
  */
 
+#include <functional>
+#include <iterator>
+
 #include "flow/ActorCollection.h"
 #include "fdbrpc/PerfMetric.h"
 #include "flow/Trace.h"
@@ -28,7 +31,6 @@
 #include "fdbserver/ConflictSet.h"
 #include "fdbserver/DataDistribution.actor.h"
 #include "fdbserver/Knobs.h"
-#include <iterator>
 #include "fdbserver/WaitFailure.h"
 #include "fdbserver/WorkerInterface.actor.h"
 #include "fdbserver/ClusterRecruitmentInterface.h"
@@ -485,7 +487,8 @@ ACTOR Future<Void> updateRegistration( Reference<MasterData> self, Reference<ILo
 	}
 }
 
-ACTOR Future<Standalone<CommitTransactionRef>> provisionalMaster( Reference<MasterData> parent, Future<Void> activate ) {
+ACTOR Future<Standalone<CommitTransactionRef>> provisionalMaster(Reference<MasterData> parent, Future<Void> activate,
+                                                                 std::vector<std::function<void()>>* replyThunks) {
 	wait(activate);
 
 	// Register a fake master proxy (to be provided right here) to make ourselves available to clients
@@ -511,11 +514,15 @@ ACTOR Future<Standalone<CommitTransactionRef>> provisionalMaster( Reference<Mast
 				rep.locked = locked;
 				rep.metadataVersion = metadataVersion;
 				req.reply.send( rep );
-			} else
-				req.reply.send(Never());  // We can't perform causally consistent reads without recovering
+			} else {
+				// Send nothing, and delay the destruction of promise so that the client gets the broken_promise
+				// error later (behavior of tryGetReply used by loadBalance), and knows that the endpoint is no longer
+				// valid.
+				replyThunks->push_back([req]() {}); // We can't perform causally consistent reads without recovering
+			}
 		}
 		when ( CommitTransactionRequest req = waitNext( parent->provisionalProxies[0].commit.getFuture() ) ) {
-			req.reply.send(Never()); // don't reply (clients always get commit_unknown_result)
+			replyThunks->push_back([req]() { });
 			auto t = &req.transaction;
 			if (t->read_snapshot == parent->lastEpochEnd && //< So no transactions can fall between the read snapshot and the recovery transaction this (might) be merged with
 				// vvv and also the changes we will make in the recovery transaction (most notably to lastEpochEndKey) BEFORE we merge initialConfChanges won't conflict
@@ -535,7 +542,7 @@ ACTOR Future<Standalone<CommitTransactionRef>> provisionalMaster( Reference<Mast
 			}
 		}
 		when ( GetKeyServerLocationsRequest req = waitNext( parent->provisionalProxies[0].getKeyServersLocations.getFuture() ) ) {
-			req.reply.send(Never());
+			replyThunks->push_back([req]() {});
 		}
 		when ( wait( waitFailure ) ) { throw worker_removed(); }
 	}
@@ -832,17 +839,19 @@ ACTOR Future<Void> recoverFrom( Reference<MasterData> self, Reference<ILogSystem
 	// a provisional master is initialized, and an "emergency transaction" is submitted that might change the configuration so that we can
 	// finish recovery.
 
+	state std::vector<std::function<void()>> provisionalReplyThunks;
 	state std::map<Optional<Value>,int8_t> originalLocalityMap = self->dcId_locality;
 	state Future<vector<Standalone<CommitTransactionRef>>> recruitments = recruitEverything( self, seedServers, oldLogSystem );
 	state double provisionalDelay = SERVER_KNOBS->PROVISIONAL_START_DELAY;
 	loop {
-		state Future<Standalone<CommitTransactionRef>> provisional = provisionalMaster(self, delay(provisionalDelay));
+		state Future<Standalone<CommitTransactionRef>> provisional = provisionalMaster(self, delay(provisionalDelay), &provisionalReplyThunks);
 		provisionalDelay = std::min(SERVER_KNOBS->PROVISIONAL_MAX_DELAY, provisionalDelay*SERVER_KNOBS->PROVISIONAL_DELAY_GROWTH);
+		state bool recruitedEverything = false;
+
 		choose {
 			when (vector<Standalone<CommitTransactionRef>> confChanges = wait( recruitments )) {
 				initialConfChanges->insert( initialConfChanges->end(), confChanges.begin(), confChanges.end() );
-				provisional.cancel();
-				break;
+				recruitedEverything = true;
 			}
 			when (Standalone<CommitTransactionRef> _req = wait( provisional )) {
 				state Standalone<CommitTransactionRef> req = _req;  // mutable
@@ -875,8 +884,17 @@ ACTOR Future<Void> recoverFrom( Reference<MasterData> self, Reference<ILogSystem
 		}
 
 		provisional.cancel();
+		for (auto cb : provisionalReplyThunks) {
+			cb();
+		}
+		provisionalReplyThunks.clear();
+
+		if (recruitedEverything) {
+			break;
+		}
 	}
 
+	self->provisionalProxies.clear();
 	return Void();
 }
 
@@ -1442,6 +1460,8 @@ ACTOR Future<Void> masterServer( MasterInterface mi, Reference<AsyncVar<ServerDB
 				onDBChange = db->onChange();
 				if (!lifetime.isStillValid( db->get().masterLifetime, mi.id()==db->get().master.id() )) {
 					TraceEvent("MasterTerminated", mi.id()).detail("Reason", "LifetimeToken").detail("MyToken", lifetime.toString()).detail("CurrentToken", db->get().masterLifetime.toString());
+					if (!db->get().client.proxies.empty())
+						IFailureMonitor::failureMonitor().endpointNotFound(db->get().client.proxies[0].getConsistentReadVersion.getEndpoint());
 					TEST(true);  // Master replaced, dying
 					if (BUGGIFY) wait( delay(5) );
 					throw worker_removed();
