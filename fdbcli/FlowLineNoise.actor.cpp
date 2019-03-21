@@ -139,7 +139,7 @@ Future<Optional<std::string>> LineNoise::read( std::string const& prompt ) {
     return f;
 }
 
-ACTOR Future<Void> waitKeyboardInterrupt(boost::asio::io_service* ios) {
+ACTOR Future<Void> waitKeyboardInterrupt(boost::asio::io_context* ios) {
     state boost::asio::signal_set signals(*ios, SIGINT);
     Promise<Void> result;
     signals.async_wait([result](const boost::system::error_code& error, int signal_number) {
@@ -155,7 +155,7 @@ ACTOR Future<Void> waitKeyboardInterrupt(boost::asio::io_service* ios) {
 }
 
 Future<Void> LineNoise::onKeyboardInterrupt() {
-    boost::asio::io_service* ios = (boost::asio::io_service*)g_network->global(INetwork::enASIOService);
+    boost::asio::io_context* ios = (boost::asio::io_context*)g_network->global(INetwork::enASIOService);
     if (!ios) return Never();
     return waitKeyboardInterrupt(ios);
 }

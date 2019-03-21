@@ -32,8 +32,8 @@ IPAddress determinePublicIPAutomatically(ClusterConnectionString const& ccs) {
 	try {
 		using namespace boost::asio;
 
-		io_service ioService;
-		ip::udp::socket socket(ioService);
+		io_context ioContext;
+		ip::udp::socket socket(ioContext);
 
 		const auto& coordAddr = ccs.coordinators()[0];
 		const auto boostIp = coordAddr.ip.isV6() ? ip::address(ip::address_v6(coordAddr.ip.toV6()))

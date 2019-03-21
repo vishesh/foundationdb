@@ -60,8 +60,8 @@ class ThreadPool : public IThreadPool, public ReferenceCounted<ThreadPool> {
 	}
 
 	std::vector<Thread*> threads;
-	boost::asio::io_service ios;
-	boost::asio::io_service::work dontstop;
+	boost::asio::io_context ios;
+	boost::asio::io_context::work dontstop;
 	enum Mode { Run=0, Shutdown=2 };
 	volatile int mode;
 

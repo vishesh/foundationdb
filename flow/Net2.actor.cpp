@@ -274,13 +274,13 @@ public:
 		closeSocket();
 	}
 
-	explicit Connection( boost::asio::io_service& io_service )
-		: id(g_nondeterministic_random->randomUniqueID()), socket(io_service)
+	explicit Connection( boost::asio::io_context& io_context )
+		: id(g_nondeterministic_random->randomUniqueID()), socket(io_context)
 	{
 	}
 
 	// This is not part of the IConnection interface, because it is wrapped by INetwork::connect()
-	ACTOR static Future<Reference<IConnection>> connect( boost::asio::io_service* ios, NetworkAddress addr ) {
+	ACTOR static Future<Reference<IConnection>> connect( boost::asio::io_context* ios, NetworkAddress addr ) {
 		state Reference<Connection> self( new Connection(*ios) );
 
 		self->peer_address = addr;
@@ -442,8 +442,8 @@ class Listener : public IListener, ReferenceCounted<Listener> {
 	tcp::acceptor acceptor;
 
 public:
-	Listener( boost::asio::io_service& io_service, NetworkAddress listenAddress )
-		: listenAddress(listenAddress), acceptor( io_service, tcpEndpoint( listenAddress ) )
+	Listener( boost::asio::io_context& io_context, NetworkAddress listenAddress )
+		: listenAddress(listenAddress), acceptor( io_context, tcpEndpoint( listenAddress ) )
 	{
 	}
 
@@ -459,7 +459,7 @@ public:
 
 private:
 	ACTOR static Future<Reference<IConnection>> doAccept( Listener* self ) {
-		state Reference<Connection> conn( new Connection( self->acceptor.get_io_service() ) );
+		state Reference<Connection> conn( new Connection( self->acceptor.get_executor().context() ) );
 		state tcp::acceptor::endpoint_type peer_endpoint;
 		try {
 			BindPromise p("N2_AcceptError", UID());
@@ -899,8 +899,8 @@ bool Net2::isAddressOnThisHost( NetworkAddress const& addr ) {
 	if (addressOnHostCache.size() > 50000) addressOnHostCache.clear();  // Bound cache memory; should not really happen
 
 	try {
-		boost::asio::io_service ioService;
-		boost::asio::ip::udp::socket socket(ioService);
+		boost::asio::io_context ioContext;
+		boost::asio::ip::udp::socket socket(ioContext);
 		boost::asio::ip::udp::endpoint endpoint(tcpAddress(addr.ip), 1);
 		socket.connect(endpoint);
 		bool local = addr.ip.isV6() ? socket.local_endpoint().address().to_v6().to_bytes() == addr.ip.toV6()

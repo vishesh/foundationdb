@@ -21,7 +21,7 @@
 
 #include "fdbrpc/Net2FileSystem.h"
 
-// Define boost::asio::io_service
+// Define boost::asio::io_context
 #include <algorithm>
 #define BOOST_SYSTEM_NO_LIB
 #define BOOST_DATE_TIME_NO_LIB
@@ -67,7 +67,7 @@ Future< Reference<class IAsyncFile> > Net2FileSystem::open( std::string filename
 		f = AsyncFileKAIO::open(filename, flags, mode, NULL);
 	else
 #endif
-	f = Net2AsyncFile::open(filename, flags, mode, static_cast<boost::asio::io_service*> ((void*) g_network->global(INetwork::enASIOService)));
+	f = Net2AsyncFile::open(filename, flags, mode, static_cast<boost::asio::io_context*> ((void*) g_network->global(INetwork::enASIOService)));
 	if(FLOW_KNOBS->PAGE_WRITE_CHECKSUM_HISTORY > 0)
 		f = map(f, [=](Reference<IAsyncFile> r) { return Reference<IAsyncFile>(new AsyncFileWriteChecker(r)); });
 	return f;

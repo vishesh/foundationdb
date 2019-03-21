@@ -42,7 +42,7 @@ public:
 	static bool should_poll() { return false; }
 	// FIXME: This implementation isn't actually asynchronous - it just does operations synchronously!
 
-	static Future<Reference<IAsyncFile>> open( std::string filename, int flags, int mode, boost::asio::io_service* ios ) {
+	static Future<Reference<IAsyncFile>> open( std::string filename, int flags, int mode, boost::asio::io_context* ios ) {
 		ASSERT( flags & OPEN_UNBUFFERED );
 
 		std::string open_filename = filename;
@@ -173,7 +173,7 @@ private:
 	int flags;
 	std::string filename;
 
-	AsyncFileWinASIO(boost::asio::io_service& ios, HANDLE h, int flags, std::string filename)
+	AsyncFileWinASIO(boost::asio::io_context& ios, HANDLE h, int flags, std::string filename)
 		: file(ios, h), flags(flags), filename(filename) {}
 };
 
