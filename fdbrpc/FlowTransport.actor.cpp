@@ -1023,12 +1023,11 @@ Endpoint FlowTransport::loadedEndpoint( const UID& token ) {
 	return Endpoint(g_currentDeliveryPeerAddress, token);
 }
 
-void FlowTransport::addPeerReference( const Endpoint& endpoint, NetworkMessageReceiver* receiver ) {
+void FlowTransport::addPeerReference(const Endpoint& endpoint, bool isStream) {
 	if (FlowTransport::transport().isClient()) {
 		IFailureMonitor::failureMonitor().setStatus(endpoint.getPrimaryAddress(), FailureStatus(false));
 	}
-
-	if (!receiver->isStream() || !endpoint.getPrimaryAddress().isValid()) return;
+	if (!isStream || !endpoint.getPrimaryAddress().isValid()) return;
 	Peer* peer = self->getPeer(endpoint.getPrimaryAddress());
 	if(peer->peerReferences == -1) {
 		peer->peerReferences = 1;
@@ -1037,8 +1036,8 @@ void FlowTransport::addPeerReference( const Endpoint& endpoint, NetworkMessageRe
 	}
 }
 
-void FlowTransport::removePeerReference( const Endpoint& endpoint, NetworkMessageReceiver* receiver ) {
-	if (!receiver->isStream() || !endpoint.getPrimaryAddress().isValid()) return;
+void FlowTransport::removePeerReference(const Endpoint& endpoint, bool isStream) {
+	if (!isStream || !endpoint.getPrimaryAddress().isValid()) return;
 	Peer* peer = self->getPeer(endpoint.getPrimaryAddress(), false);
 	if(peer) {
 		peer->peerReferences--;
