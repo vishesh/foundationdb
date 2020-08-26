@@ -292,7 +292,7 @@ class TestRunner(object):
 
         util.get_logger().info('\nRunning tester \'%s\'...' % ' '.join(params))
         sys.stdout.flush()
-        proc = subprocess.Popen(params)
+        proc = subprocess.Popen(params, stdout=sys.stdout, stderr=sys.stderr)
         timed_out = Event()
 
         def killProc():
