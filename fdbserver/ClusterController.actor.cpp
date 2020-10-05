@@ -2896,6 +2896,37 @@ ACTOR Future<Void> dbInfoUpdater( ClusterControllerData* self ) {
 	}
 }
 
+typedef std::deque<std::unordered_map<NetworkAddress, FailureMonitorMetrics>> MetricsDeque;
+
+ACTOR Future<Void> failureMonitoringServer(UID uniqueID, ClusterControllerData::DBInfo* db,
+                                           FutureStream<FailureMonitorPublishMetricsRequest> requests) {
+	state Future<Void> periodically = Never();
+	state std::unordered_map<NetworkAddress, MetricsDeque> metrics =
+	    std::unordered_map<NetworkAddress, MetricsDeque>();
+	state int FAILURE_MONITOR_SERVER_HISTORY_SIZE = 5;
+
+	loop choose {
+		when(FailureMonitorPublishMetricsRequest req = waitNext(requests)) {
+			const NetworkAddress& peer = req.reply.getEndpoint().getPrimaryAddress();
+			TraceEvent(SevInfo, "FailureMonitorPublishMetricsRequestReceived").detail("From", peer);
+
+			MetricsDeque& entry = metrics[peer];
+			entry.push_back(req.metrics);
+			while (entry.size() > 5) {
+				entry.pop_front();
+			}
+
+			auto reply = FailureMonitorPublishMetricsReply();
+			req.reply.send(reply);
+		}
+		when(wait(delay(10))) {
+			// TODO: Take actions
+			// 1. Check if we got update from all workers in last X seconds.
+			// 2. Run the algorithm.
+		}
+	}
+}
+
 ACTOR Future<Void> clusterControllerCore( ClusterControllerFullInterface interf, Future<Void> leaderFail, ServerCoordinators coordinators, LocalityData locality ) {
 	state ClusterControllerData self( interf, locality );
 	state Future<Void> coordinationPingDelay = delay( SERVER_KNOBS->WORKER_COORDINATION_PING_DELAY );
@@ -2915,6 +2946,9 @@ ACTOR Future<Void> clusterControllerCore( ClusterControllerFullInterface interf,
 	self.addActor.send( handleForcedRecoveries(&self, interf) );
 	self.addActor.send( monitorDataDistributor(&self) );
 	self.addActor.send( monitorRatekeeper(&self) );
+	self.addActor.send(
+	    failureMonitoringServer(self.id, &self.db, interf.clientInterface.failureMonitoring.getFuture()));
+
 	self.addActor.send( dbInfoUpdater(&self) );
 	self.addActor.send( traceCounters("ClusterControllerMetrics", self.id, SERVER_KNOBS->STORAGE_LOGGING_DELAY, &self.clusterControllerMetrics, self.id.toString() + "/ClusterControllerMetrics") );
 	self.addActor.send( traceRole(Role::CLUSTER_CONTROLLER, interf.id()) );

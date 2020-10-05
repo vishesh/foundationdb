@@ -31,11 +31,11 @@
 struct ClusterInterface {
     constexpr static FileIdentifier file_identifier = 15888863;
 	RequestStream< struct OpenDatabaseRequest > openDatabase;
-	RequestStream< struct FailureMonitoringRequest > failureMonitoring;
 	RequestStream< struct StatusRequest > databaseStatus;
 	RequestStream< ReplyPromise<Void> > ping;
 	RequestStream< struct GetClientWorkersRequest > getClientWorkers;
 	RequestStream< struct ForceRecoveryRequest > forceRecovery;
+	RequestStream< struct FailureMonitorPublishMetricsRequest > failureMonitoring;
 
 	bool operator == (ClusterInterface const& r) const { return id() == r.id(); }
 	bool operator != (ClusterInterface const& r) const { return id() != r.id(); }
@@ -44,7 +44,7 @@ struct ClusterInterface {
 
 	bool hasMessage() {
 		return openDatabase.getFuture().isReady() ||
-		failureMonitoring.getFuture().isReady() || 
+		failureMonitoring.getFuture().isReady() ||
 		databaseStatus.getFuture().isReady() ||
 		ping.getFuture().isReady() ||
 		getClientWorkers.getFuture().isReady() ||
@@ -62,7 +62,7 @@ struct ClusterInterface {
 
 	template <class Ar>
 	void serialize( Ar& ar ) {
-		serializer(ar, openDatabase, failureMonitoring, databaseStatus, ping, getClientWorkers, forceRecovery);
+		serializer(ar, openDatabase, databaseStatus, ping, getClientWorkers, forceRecovery, failureMonitoring);
 	}
 };
 
@@ -157,7 +157,7 @@ struct OpenDatabaseRequest {
 	std::vector<ItemWithExamples<Key>> issues;
 	std::vector<ItemWithExamples<Standalone<ClientVersionRef>>> supportedVersions;
 	std::vector<ItemWithExamples<Key>> maxProtocolSupported;
-	
+
 	UID knownClientInfoID;
 	ReplyPromise< struct ClientDBInfo > reply;
 
@@ -181,44 +181,6 @@ struct SystemFailureStatus {
 	template <class Ar>
 	void serialize(Ar& ar) {
 		serializer(ar, addresses, status);
-	}
-};
-
-struct FailureMonitoringReply {
-	constexpr static FileIdentifier file_identifier = 6820325;
-	VectorRef< SystemFailureStatus > changes;
-	Version failureInformationVersion;
-	bool allOthersFailed;							// If true, changes are relative to all servers being failed, otherwise to the version given in the request
-	int clientRequestIntervalMS,        // after this many milliseconds, send another request
-		considerServerFailedTimeoutMS;  // after this many additional milliseconds, consider the ClusterController itself to be failed
-	Arena arena;
-
-	template <class Ar>
-	void serialize(Ar& ar) {
-		serializer(ar, changes, failureInformationVersion, allOthersFailed, clientRequestIntervalMS, considerServerFailedTimeoutMS, arena);
-	}
-};
-
-struct FailureMonitoringRequest {
-	// Sent by all participants to the cluster controller reply.clientRequestIntervalMS
-	//   ms after receiving the previous reply.
-	// Provides the controller the self-diagnosed status of the sender, and also
-	//   requests the status of other systems.  Failure to timely send one of these implies
-	//   a failed status.
-	// If !senderStatus.present(), the sender wants to receive the latest failure information
-	//   but doesn't want to be monitored.
-	// The failureInformationVersion returned in reply should be passed back to the
-	//   next request to facilitate delta compression of the failure information.
-
-	constexpr static FileIdentifier file_identifier = 5867851;
-	Optional<FailureStatus> senderStatus;
-	Version failureInformationVersion;
-	NetworkAddressList addresses;
-	ReplyPromise< struct FailureMonitoringReply > reply;
-
-	template <class Ar>
-	void serialize(Ar& ar) {
-		serializer(ar, senderStatus, failureInformationVersion, addresses, reply);
 	}
 };
 
@@ -281,6 +243,31 @@ struct ForceRecoveryRequest {
 	template <class Ar>
 	void serialize(Ar& ar) {
 		serializer(ar, dcId, reply);
+	}
+};
+
+struct FailureMonitorPublishMetricsReply {
+	constexpr static FileIdentifier file_identifier = 2834383;
+
+	Version version;
+	std::unordered_map<NetworkAddress, FailureStatus> status;
+
+	template <class Ar>
+	void serialize(Ar& ar) {
+		serializer(ar);
+	}
+};
+
+struct FailureMonitorPublishMetricsRequest {
+	constexpr static FileIdentifier file_identifier = 2834384;
+
+	Version version;
+	std::unordered_map<NetworkAddress, FailureMonitorMetrics> metrics;
+	ReplyPromise<FailureMonitorPublishMetricsReply> reply;
+
+	template <class Ar>
+	void serialize(Ar& ar) {
+		serializer(ar, reply);
 	}
 };
 

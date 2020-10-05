@@ -24,18 +24,108 @@
 #include <deque>
 #include <unordered_map>
 
-#include <flow/flow.h>
+#include "flow/flow.h"
+// #include "fdbrpc/FailureMonitor.h"
 
-class HealthMonitor {
+struct FailureMonitorMetrics {
+	// Is this peer marked as failed for N seconds.
+	bool failed;
+
+	// Number of times the connection failed in last N seconds.
+	int failedConnectionCount;
+
+	// Number of slow and total replies from tLog, i.e. `pair<SlowReplies, TotalReplies>`.
+	Optional<std::pair<int, int>> tlogPushLatencies;
+
+	template <class Ar>
+	void serialize(Ar& ar) {
+		serializer(ar, failed, failedConnectionCount, tlogPushLatencies);
+	}
+};
+
+template <class Entry>
+class SlidingWindowStat {
 public:
-	void reportPeerClosed(const NetworkAddress& peerAddress);
-	bool tooManyConnectionsClosed(const NetworkAddress& peerAddress);
-	int closedConnectionsCount(const NetworkAddress& peerAddress);
-private:
-	void purgeOutdatedHistory();
+	SlidingWindowStat(int windowDurationSecs) : windowDurationSecs(windowDurationSecs) {}
 
-	std::deque<std::pair<double, NetworkAddress>> peerClosedHistory;
-	std::unordered_map<NetworkAddress, int> peerClosedNum;
+	void add(const Entry& val) {
+		sweep();
+		entries.emplace_back(now(), val);
+	}
+
+	int count() {
+		sweep();
+		return entries.size();
+	}
+
+private:
+	void sweep() {
+		for (const auto& it : entries) {
+			if (it.first < now() - windowDurationSecs) {
+				entries.pop_front();
+			}
+		}
+	}
+
+	std::deque<std::pair<double, Entry>> entries;
+
+	// Size of sliding window in seconds. Older entries are purged.
+	const int windowDurationSecs;
+};
+
+class ClosedConnectionsStats {
+public:
+	void add(const NetworkAddress& address) {
+		auto it = counters.find(address);
+		if (counters.find(address) == counters.end()) {
+			std::tie(it, std::ignore) = counters.insert(std::make_pair(
+			    address, SlidingWindowStat<int>(FLOW_KNOBS->HEALTH_MONITOR_CLIENT_REQUEST_INTERVAL_SECS)));
+		}
+		it->second.add(1);
+	}
+
+	int count(const NetworkAddress& address) {
+		auto it = counters.find(address);
+		if (it == counters.end()) {
+			return 0;
+		}
+
+		return it->second.count();
+	}
+
+	bool limitExceeded(const NetworkAddress& address) {
+		return count(address) > FLOW_KNOBS->HEALTH_MONITOR_CONNECTION_MAX_CLOSED;
+	}
+
+private:
+	std::unordered_map<NetworkAddress, SlidingWindowStat<int>> counters;
+};
+
+class TLogPushLatency {
+public:
+	void add(const NetworkAddress& address, double latency) {
+		auto it = latencies.find(address);
+		if (latencies.find(address) == latencies.end()) {
+			std::tie(it, std::ignore) = latencies.insert(std::make_pair(
+			    address, SlidingWindowStat<int>(FLOW_KNOBS->HEALTH_MONITOR_CLIENT_REQUEST_INTERVAL_SECS)));
+		}
+		it->second.add(1);
+	}
+
+private:
+	std::unordered_map<NetworkAddress, SlidingWindowStat<double>> latencies;
+};
+
+struct HealthMonitor {
+	ClosedConnectionsStats closedConnections;
+
+	FailureMonitorMetrics aggregateFailureMetrics(const NetworkAddress& peer) {
+		FailureMonitorMetrics metrics;
+		// metrics.failed = IFailureMonitor::failureMonitor().getState(peer).isFailed();
+		metrics.failedConnectionCount = closedConnections.count(peer);
+
+		return metrics;
+	}
 };
 
 #endif // FDBRPC_HEALTH_MONITOR_H
