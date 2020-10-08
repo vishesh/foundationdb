@@ -27,26 +27,11 @@
 #include "flow/flow.h"
 // #include "fdbrpc/FailureMonitor.h"
 
-struct FailureMonitorMetrics {
-	// Is this peer marked as failed for N seconds.
-	bool failed;
-
-	// Number of times the connection failed in last N seconds.
-	int failedConnectionCount;
-
-	// Number of slow and total replies from tLog, i.e. `pair<SlowReplies, TotalReplies>`.
-	Optional<std::pair<int, int>> tlogPushLatencies;
-
-	template <class Ar>
-	void serialize(Ar& ar) {
-		serializer(ar, failed, failedConnectionCount, tlogPushLatencies);
-	}
-};
 
 template <class Entry>
 class SlidingWindowStat {
 public:
-	SlidingWindowStat(int windowDurationSecs) : windowDurationSecs(windowDurationSecs) {}
+	SlidingWindowStat(const int windowDurationSecs_) : windowDurationSecs(windowDurationSecs_) {}
 
 	void add(const Entry& val) {
 		sweep();
@@ -60,11 +45,8 @@ public:
 
 private:
 	void sweep() {
-		for (const auto& it : entries) {
-			if (it.first < now() - windowDurationSecs) {
-				entries.pop_front();
-			}
-		}
+		const double CRITERIA = now() - windowDurationSecs;
+		while(!entries.empty() && entries.front().first < CRITERIA) entries.pop_front();
 	}
 
 	std::deque<std::pair<double, Entry>> entries;
@@ -101,19 +83,49 @@ private:
 	std::unordered_map<NetworkAddress, SlidingWindowStat<int>> counters;
 };
 
-class TLogPushLatency {
+namespace {
+template <typename PEER_TYPE, typename LATENCY_TYPE>
+class LatencyBase {
+	using SlidingWindowState_t = SlidingWindowStat<LATENCY_TYPE>;
+
 public:
-	void add(const NetworkAddress& address, double latency) {
-		auto it = latencies.find(address);
-		if (latencies.find(address) == latencies.end()) {
-			std::tie(it, std::ignore) = latencies.insert(std::make_pair(
-			    address, SlidingWindowStat<int>(FLOW_KNOBS->HEALTH_MONITOR_CLIENT_REQUEST_INTERVAL_SECS)));
+	using peer_t = PEER_TYPE
+	using latency_t = LATENCY_TYPE
+
+	void add(const peer_t& peer, const latency_t& latency) {
+		if (latencies.find(peer) == latencies.end()) {
+			latencies[peer] = SlidingWindowState_t(FLOW_KNOBS->HEALTH_MONITOR_CLIENT_REQUEST_INTERVAL_SECS);
 		}
-		it->second.add(1);
+		latencies[peer].add(latency);
 	}
 
-private:
-	std::unordered_map<NetworkAddress, SlidingWindowStat<double>> latencies;
+protected:
+	std::unordered_map<peer_t, SlidingWindowStat<double>> latencies;
+};
+
+template <typename LATENCY_TYPE>
+using NetworkLatencyBase = LatencyBase<NetworkAddress, LATENCY_TYPE>;
+}	// anonymous namespace
+
+using TLogPushLatency = NetworkLatencyBase<double>;
+using CommitResolvingLatency = NetworkLatencyBase<double>;
+
+struct FailureMonitorMetrics {
+	// Is this peer marked as failed for N seconds.
+	bool failed;
+
+	// Number of times the connection failed in last N seconds.
+	int failedConnectionCount;
+
+	// Number of slow and total replies from tLog, i.e. `pair<SlowReplies, TotalReplies>`.
+	Optional<TLogPushLatency> tlogPushLatencies;
+
+	Optional<CommitResolvingLatency> commitResolvingLatencies;
+
+	template <class Ar>
+	void serialize(Ar& ar) {
+		serializer(ar, failed, failedConnectionCount, tlogPushLatencies, commitResolvingLatencies);
+	}
 };
 
 struct HealthMonitor {
