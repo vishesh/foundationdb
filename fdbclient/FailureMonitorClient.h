@@ -1,5 +1,5 @@
 /*
- * HealthMonitor.actor.cpp
+ * FailureMonitorMetrics.h
  *
  * This source file is part of the FoundationDB open source project
  *
@@ -18,6 +18,11 @@
  * limitations under the License.
  */
 
-#include "fdbrpc/FailureMonitor.h"
-#include "fdbrpc/FlowTransport.h"
-#include "fdbrpc/HealthMonitor.h"
+#ifndef FDBCLIENT_FAILUREMONITORCLIENT_H
+#define FDBCLIENT_FAILUREMONITORCLIENT_H
+
+#include "flow/flow.h"
+
+Future<Void> failureMonitorStatsPublisher(Reference<AsyncVar<Optional<struct ClusterInterface>>> const&);
+
+#endif

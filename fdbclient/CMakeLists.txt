@@ -20,6 +20,8 @@ set(FDBCLIENT_SRCS
   EventTypes.actor.h
   FDBOptions.h
   FDBTypes.h
+  FailureMonitorClient.h
+  FailureMonitorClient.actor.cpp
   FileBackupAgent.actor.cpp
   GrvProxyInterface.h
   HTTP.actor.cpp

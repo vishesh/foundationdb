@@ -23,6 +23,8 @@
 #pragma once
 
 #include <algorithm>
+#include <unordered_set>
+
 #include "fdbrpc/HealthMonitor.h"
 #include "flow/genericactors.actor.h"
 #include "flow/network.h"
@@ -177,6 +179,9 @@ public:
 
 	NetworkAddressList getLocalAddresses() const;
 	// Returns all local NetworkAddress.
+
+	std::unordered_set<NetworkAddress> getPeerList() const;
+	// Returns addresses of all peers;
 
 	std::map<NetworkAddress, std::pair<uint64_t, double>>* getIncompatiblePeers();
 	// Returns the same of all peers that have attempted to connect, but have incompatible protocol versions

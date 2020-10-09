@@ -434,25 +434,27 @@ ACTOR Future<Void> connectionWriter( Reference<Peer> self, Reference<IConnection
 ACTOR Future<Void> delayedHealthUpdate(NetworkAddress address) {
 	state double start = now();
 	state bool delayed = false;
+	state HealthMonitor* healthMonitor = FlowTransport::transport().healthMonitor();
+
 	loop {
 		if (FLOW_KNOBS->HEALTH_MONITOR_MARK_FAILED_UNSTABLE_CONNECTIONS &&
-		    FlowTransport::transport().healthMonitor()->tooManyConnectionsClosed(address) && address.isPublic()) {
+		    healthMonitor->closedConnections.limitExceeded(address) && address.isPublic()) {
 			if (!delayed) {
 				TraceEvent("TooManyConnectionsClosedMarkFailed")
 				    .detail("Dest", address)
 				    .detail("StartTime", start)
-				    .detail("ClosedCount", FlowTransport::transport().healthMonitor()->closedConnectionsCount(address));
+				    .detail("ClosedCount", healthMonitor->closedConnections.count(address));
 				IFailureMonitor::failureMonitor().setStatus(address, FailureStatus(true));
 			}
 			delayed = true;
 			wait(delayJittered(FLOW_KNOBS->MAX_RECONNECTION_TIME * 2.0));
 		} else {
 			if (delayed) {
-			    TraceEvent("TooManyConnectionsClosedMarkAvailable")
+				TraceEvent("TooManyConnectionsClosedMarkAvailable")
 				    .detail("Dest", address)
 				    .detail("StartTime", start)
 				    .detail("TimeElapsed", now() - start)
-				    .detail("ClosedCount", FlowTransport::transport().healthMonitor()->closedConnectionsCount(address));
+				    .detail("ClosedCount", healthMonitor->closedConnections.count(address));
 			}
 			IFailureMonitor::failureMonitor().setStatus(address, FailureStatus(false));
 			break;
@@ -641,7 +643,7 @@ ACTOR Future<Void> connectionKeeper( Reference<Peer> self,
 
 			if (conn) {
 				if (self->destination.isPublic() && e.code() == error_code_connection_failed) {
-					FlowTransport::transport().healthMonitor()->reportPeerClosed(self->destination);
+					FlowTransport::transport().healthMonitor()->closedConnections.add(self->destination);
 				}
 
 				conn->close();
@@ -1198,6 +1200,16 @@ NetworkAddressList FlowTransport::getLocalAddresses() const {
 
 NetworkAddress FlowTransport::getLocalAddress() const {
 	return self->localAddresses.address;
+}
+
+std::unordered_set<NetworkAddress> FlowTransport::getPeerList() const {
+	std::unordered_set<NetworkAddress> result;
+	for (const auto& [addr, _] : self->peers) {
+		if (addr.isPublic()) {
+			result.insert(addr);
+		}
+	}
+	return result;
 }
 
 std::map<NetworkAddress, std::pair<uint64_t, double>>* FlowTransport::getIncompatiblePeers() {
