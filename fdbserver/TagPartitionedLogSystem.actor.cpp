@@ -514,7 +514,9 @@ struct TagPartitionedLogSystem : ILogSystem, ReferenceCounted<TagPartitionedLogS
 		state double startTime = now();
 		TLogCommitReply t = wait(in);
 		if(now()-self->lastReset > SERVER_KNOBS->PUSH_RESET_INTERVAL) {
-			if(now()-startTime > SERVER_KNOBS->PUSH_MAX_LATENCY) {
+			const auto latency = now() - self->lastReset;
+			if(latency > SERVER_KNOBS->PUSH_MAX_LATENCY) {
+				FlowTransport::transport().healthMonitor()->tLogPushLatencies.add(addr, latency);
 				if(self->resetCheck.isReady()) {
 					self->resetCheck = pushResetChecker(self, addr);
 				}

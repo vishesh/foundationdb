@@ -41,6 +41,12 @@ void ClientKnobs::initialize(bool randomize) {
 	init( FAILURE_MAX_DELAY,                       5.0 );
 	init( FAILURE_MIN_DELAY,                       4.0 ); if( randomize && BUGGIFY ) FAILURE_MIN_DELAY = 1.0;
 	init( FAILURE_TIMEOUT_DELAY,     FAILURE_MIN_DELAY );
+
+	init( FAILURE_MONITOR_PUBLISH_TO_CC_ENABLED,           false );
+	init( FAILURE_MONITOR_PUBLISH_INTERVAL_SECS,           30 );
+	init( FAILURE_MONITOR_PUBLISH_REQUEST_TIMEOUT_SECS,    2 );
+	init( FAILURE_MONITOR_PUBLISH_RETRY_INTERVAL_SECS,     5 );
+
 	init( CLIENT_FAILURE_TIMEOUT_DELAY, FAILURE_MIN_DELAY );
 	init( FAILURE_EMERGENCY_DELAY,                30.0 );
 	init( FAILURE_MAX_GENERATIONS,                  10 );
