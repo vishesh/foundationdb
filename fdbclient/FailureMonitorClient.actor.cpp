@@ -33,6 +33,8 @@ ACTOR Future<Void> failureMonitorStatsPublisherLoop(ClusterInterface controller)
 		loop {
 			FailureMonitorPublishMetricsRequest req;
 			std::unordered_set<NetworkAddress> peerList = FlowTransport::transport().getPeerList();
+
+			req.version = version;
 			for (const auto& peer : peerList) {
 				req.metrics[peer] = healthMonitor->aggregateFailureMetrics(peer);
 
@@ -44,6 +46,7 @@ ACTOR Future<Void> failureMonitorStatsPublisherLoop(ClusterInterface controller)
 			choose {
 				when(FailureMonitorPublishMetricsReply reply = wait(controller.failureMonitoring.getReply(req))) {
 					TraceEvent("FailureMonitorClientPublishMetrics");
+					version = reply.version;
 					nextDelay =
 					    std::max(CLIENT_KNOBS->FAILURE_MONITOR_PUBLISH_INTERVAL_SECS - (now() - startTime), 0.0);
 				}

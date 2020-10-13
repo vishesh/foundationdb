@@ -2895,6 +2895,86 @@ ACTOR Future<Void> dbInfoUpdater( ClusterControllerData* self ) {
 		}
 	}
 }
+	
+typedef std::unordered_map<NetworkAddress, std::deque<FailureMonitorMetrics>> FailureMetricsMap;
+
+struct FailureDetectionData {
+	// Metrics collected from everyone for each peer.
+	std::unordered_map<NetworkAddress, FailureMetricsMap> metrics;
+
+	// Time when this peer last updated us.
+	std::unordered_map<NetworkAddress, double> lastReceived;
+
+	// Holds list of failed addresses.
+	std::unordered_set<NetworkAddress> failedAddresses;
+};
+
+
+ACTOR Future<Void> failureMonitoringFindDegraded(FailureDetectionData* data) {
+	loop {
+		// TODO: Also wait for enough peers to update.
+		wait (delay(CLIENT_KNOBS->FAILURE_MONITOR_PUBLISH_INTERVAL_SECS/2));
+
+
+		state std::unordered_map<NetworkAddress, FailureMetricsMap>::iterator it;
+		for (it = data->metrics.begin(); it != data->metrics.end(); ++it) {
+			const auto& [addr, metrics] = *it;
+
+			if (metrics.size() < 4) {
+				continue;
+			}
+
+			// Check how many peer consider failed
+			int failedCount = 0;
+			int connectedCount = 0;
+			for (const auto& [p, m] : metrics) {
+				failedCount += m.back().failed;
+				connectedCount += !m.back().failed;
+			}
+
+			TraceEvent("FailureMonitorCollectedStatus")
+				.detail("Peer", addr)
+				.detail("HistorySize", metrics.size())
+			    .detail("FailedCount", failedCount)
+			    .detail("SuccessCount", connectedCount);
+
+			wait (yield());
+		}
+	}
+}
+
+FailureMonitorPublishMetricsReply failureMonitoringReplyPrepare(NetworkAddress peer, FailureDetectionData* data) {
+
+	auto reply = FailureMonitorPublishMetricsReply();
+	reply.failedAddresses = data->failedAddresses;
+	return reply;
+}
+
+ACTOR Future<Void> failureMonitoringServer(UID uniqueID, ClusterControllerData::DBInfo* db,
+                                           FutureStream<FailureMonitorPublishMetricsRequest> requests) {
+	state FailureDetectionData data = FailureDetectionData();
+	state std::unordered_set<NetworkAddress> addresses;
+	state Future<Void> detector = failureMonitoringFindDegraded(&data);
+	state int FAILURE_MONITOR_SERVER_HISTORY_SIZE = 5;
+
+	loop {
+		FailureMonitorPublishMetricsRequest req = waitNext(requests);
+		const NetworkAddress& sender = req.reply.getEndpoint().getPrimaryAddress();
+
+		for (const auto& [addr, metric] : req.metrics) {
+			FailureMetricsMap& fmm = data.metrics[addr];
+			auto& metricHistory = fmm[sender];
+			metricHistory.push_back(metric);
+			metricHistory.back().lastUpdated = now();
+			if (metricHistory.size() > FAILURE_MONITOR_SERVER_HISTORY_SIZE) {
+				metricHistory.pop_front();
+			}
+		}
+
+		data.lastReceived[sender] = now();
+		req.reply.send(failureMonitoringReplyPrepare(sender, &data));
+	}
+}
 
 typedef std::deque<std::unordered_map<NetworkAddress, FailureMonitorMetrics>> MetricsDeque;
 

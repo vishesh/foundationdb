@@ -27,7 +27,6 @@
 #include "flow/flow.h"
 // #include "fdbrpc/FailureMonitor.h"
 
-
 template <class Entry>
 class SlidingWindowStat {
 public:
@@ -99,6 +98,14 @@ public:
 		latencies[peer].add(latency);
 	}
 
+	int count(const peer_t& address) {
+		auto it = counters.find(address);
+		if (it == counters.end()) {
+			return 0;
+		}
+
+		return it->second.count();
+	}
 protected:
 	std::unordered_map<peer_t, SlidingWindowStat<double>> latencies;
 };
@@ -126,10 +133,16 @@ struct FailureMonitorMetrics {
 	void serialize(Ar& ar) {
 		serializer(ar, failed, failedConnectionCount, tlogPushLatencies, commitResolvingLatencies);
 	}
+private:
+	double average;
+	
+	std::unordered_map<NetworkAddress, SlidingWindowStat<double>> latencies;
 };
 
 struct HealthMonitor {
 	ClosedConnectionsStats closedConnections;
+
+	TLogPushLatencies tLogPushLatencies;
 
 	FailureMonitorMetrics aggregateFailureMetrics(const NetworkAddress& peer) {
 		FailureMonitorMetrics metrics;

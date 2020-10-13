@@ -267,7 +267,7 @@ struct FailureMonitorPublishMetricsRequest {
 
 	template <class Ar>
 	void serialize(Ar& ar) {
-		serializer(ar, reply);
+		serializer(ar, version, metrics, reply);
 	}
 };
 
