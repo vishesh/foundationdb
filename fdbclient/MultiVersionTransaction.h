@@ -395,8 +395,10 @@ private:
 
 	void disableMultiVersionClientApi();
 	void setCallbacksOnExternalThreads();
+	void addExternalLibraries(const std::vector<std::string>& paths);
 	void addExternalLibrary(std::string path);
 	void addExternalLibraryDirectory(std::string path);
+	std::vector<std::string> copyExternalLibraryPerThread(std::string path);
 	void disableLocalClient();
 	void setSupportedClientVersions(Standalone<StringRef> versions);
 
