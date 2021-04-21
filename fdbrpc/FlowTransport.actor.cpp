@@ -1485,6 +1485,7 @@ void FlowTransport::removePeerReference(const Endpoint& endpoint, bool isStream)
 }
 
 void FlowTransport::addEndpoint(Endpoint& endpoint, NetworkMessageReceiver* receiver, TaskPriority taskID) {
+	TraceEvent("AddEndpoint").detail("Endpoint", endpoint.token).detail("Address", endpoint.getPrimaryAddress());
 	endpoint.token = deterministicRandom()->randomUniqueID();
 	if (receiver->isStream()) {
 		endpoint.addresses = self->localAddresses;
