@@ -2012,6 +2012,7 @@ ACTOR Future<Void> masterCore(Reference<MasterData> self) {
 		self->logSystem->setOldestBackupEpoch(self->cstate.myDBState.recoveryCount);
 	}
 
+	self->tLogGroupCollection->monitorStorageTeams(cx);
 	wait(Future<Void>(Never()));
 	throw internal_error();
 }
