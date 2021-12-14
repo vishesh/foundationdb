@@ -117,7 +117,7 @@ set(FDBSERVER_SRCS
   StorageCache.actor.cpp
   StorageMetrics.actor.h
   StorageMetrics.h
-  storageserver.actor.cpp
+  StorageServer.actor.cpp
   TagPartitionedLogSystem.actor.cpp
   TagPartitionedLogSystem.actor.h
   template_fdb.h
@@ -142,10 +142,10 @@ set(FDBSERVER_SRCS
   ptxn/test/CommitUtils.h
   ptxn/test/Driver.actor.cpp
   ptxn/test/Driver.h
-  ptxn/test/FakeLogSystem.h
   ptxn/test/FakeLogSystem.cpp
-  ptxn/test/FakePeekCursor.h
+  ptxn/test/FakeLogSystem.h
   ptxn/test/FakePeekCursor.cpp
+  ptxn/test/FakePeekCursor.h
   ptxn/test/FakeProxy.actor.cpp
   ptxn/test/FakeProxy.actor.h
   ptxn/test/FakeResolver.actor.h
@@ -160,6 +160,8 @@ set(FDBSERVER_SRCS
   ptxn/test/RealTLog.actor.h
   ptxn/test/TestResolver.actor.cpp
   ptxn/test/TestSerialization.cpp
+  ptxn/test/TestStorageServer.actor.cpp
+  ptxn/test/TestStorageServer.actor.h
   ptxn/test/TestTLogPeek.actor.cpp
   ptxn/test/TestTLogPeek.h
   ptxn/test/TestTLogServer.actor.cpp

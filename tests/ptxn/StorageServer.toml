@@ -1,12 +1,27 @@
+#[[test]]
+#testTitle = 'Storage Server Test'
+#useDB = false
+#startDelay = 0
+#
+#    [[test.workload]]
+#    testName = 'UnitTests'
+#    maxTestCases = 1
+#    testsMatching = 'fdbserver/ptxn/test/storageserver'
+#
+#    nMutationsPerMore = 20
+#    maxMutations = 200
+#    advanceVersionsPerMutation = 1000
+#    verifyId = 198
+
 [[test]]
-testTitle = 'Storage Server Test'
+testTitle = 'Storage Server read from TLog'
 useDB = false
 startDelay = 0
 
     [[test.workload]]
     testName = 'UnitTests'
     maxTestCases = 1
-    testsMatching = 'fdbserver/ptxn/test/storageserver'
+    testsMatching = 'fdbserver/ptxn/test/StorageServerPull'
 
     nMutationsPerMore = 20
     maxMutations = 200

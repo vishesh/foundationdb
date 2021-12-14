@@ -5219,6 +5219,7 @@ ACTOR Future<Void> storageServer(IKeyValueStore* persistentData,
 	self.folder = folder;
 
 	try {
+
 		wait(self.storage.init());
 		wait(self.storage.commit());
 
