@@ -120,6 +120,8 @@ set(FDBSERVER_SRCS
   StorageServer.actor.cpp
   TagPartitionedLogSystem.actor.cpp
   TagPartitionedLogSystem.actor.h
+  TeamPartitionedLogSystem.actor.cpp
+  TeamPartitionedLogSystem.actor.h
   template_fdb.h
 
   ptxn/Config.h
