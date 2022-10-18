@@ -20,6 +20,8 @@
 
 #include <cinttypes>
 #include <functional>
+#include <iostream>
+#include <stdint.h>
 #include <type_traits>
 #include <unordered_map>
 
@@ -6501,9 +6503,8 @@ public:
 	  : currentVersion(fromVersion), fromVersion(fromVersion), restoredVersion(restoredVersion),
 	    processedStartKey(false), processedCacheStartKey(false) {}
 
-	void applyMutation(StorageServer* data, MutationRef const& m, Version ver, bool fromFetch) {
+	void applyMutation(StorageServer* data, MutationRef& m, Version ver, bool fromFetch) {
 		//TraceEvent("SSNewVersion", data->thisServerID).detail("VerWas", data->mutableData().latestVersion).detail("ChVer", ver);
-
 		if (currentVersion != ver) {
 			fromVersion = currentVersion;
 			currentVersion = ver;
@@ -6523,7 +6524,15 @@ public:
 				DEBUG_MUTATION("SSUpdateMutation", ver, m, data->thisServerID).detail("FromFetch", fromFetch);
 			}
 
-			splitMutation(data, data->shards, m, ver, fromFetch);
+			if (g_network->isSimulated() && deterministicRandom()->random01() >= 0.9999) {
+				if (m.param2.size() > 2) {
+					// std::cout << "Changing: " << printable(m.param1) << std::endl;
+					m.param2 = m.param2.substr(1);
+				}
+				splitMutation(data, data->shards, m, ver, fromFetch);
+			} else {
+				splitMutation(data, data->shards, m, ver, fromFetch);
+			}
 		}
 
 		if (data->otherError.getFuture().isReady())

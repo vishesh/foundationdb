@@ -21,6 +21,7 @@
 #include "flow/network.h"
 #include "flow/serialize.h"
 #include "flow/UnitTest.h"
+#include <iostream>
 
 _AssumeVersion::_AssumeVersion(ProtocolVersion version) : v(version) {
 	if (!version.isValid()) {
