@@ -61,6 +61,7 @@
 #include "fdbserver/ServerDBInfo.h"
 #include "fdbserver/SingletonRoles.h"
 #include "fdbserver/Status.actor.h"
+#include "fdbserver/MasterData.actor.h"
 #include "fdbserver/LatencyBandConfig.h"
 #include "fdbclient/GlobalConfig.actor.h"
 #include "fdbserver/RecoveryState.h"
@@ -72,8 +73,9 @@
 #include "flow/Error.h"
 #include "flow/Trace.h"
 #include "flow/Util.h"
-
+#include "SwiftModules/FDBServer"
 #include "metacluster/MetaclusterMetrics.h"
+
 
 #include "flow/actorcompiler.h" // This must be the last #include.
 
@@ -90,6 +92,10 @@ ACTOR Future<Optional<Value>> getPreviousCoordinators(ClusterControllerData* sel
 			wait(tr.onError(e));
 		}
 	}
+}
+
+void updateWorkerHealthSwift(const UpdateWorkerHealthRequest& req, ClusterControllerData* self) {
+ 	fdbserver_swift::updateWorkerHealth(req, self);
 }
 
 ACTOR Future<Void> clusterWatchDatabase(ClusterControllerData* cluster,
@@ -2715,8 +2721,31 @@ ACTOR Future<Void> dbInfoUpdater(ClusterControllerData* self) {
 	}
 }
 
+ACTOR Future<Void> workerHealthMonitorSwiftHelper(ClusterControllerData* self) {
+	loop {
+		try {
+			while (!self->goodRecruitmentTime.isReady()) {
+				wait(lowPriorityDelay(SERVER_KNOBS->CC_WORKER_HEALTH_CHECKING_INTERVAL));
+				fdbserver_swift::workerHealthMonitorSwift(self);
+				wait(delay(SERVER_KNOBS->CC_WORKER_HEALTH_CHECKING_INTERVAL));
+			}
+		} catch (Error& e) {
+			TraceEvent(SevWarnAlways, "ClusterControllerHealthMonitorError").error(e);
+			if (e.code() == error_code_actor_cancelled) {
+				throw;
+			}
+		}
+	}
+}
+
 // The actor that periodically monitors the health of tracked workers.
 ACTOR Future<Void> workerHealthMonitor(ClusterControllerData* self) {
+	const int USE_SWIFT = true; // TODO: Make it knob
+	if (USE_SWIFT) {
+		wait(workerHealthMonitorSwiftHelper(self));
+		return Void();
+	}
+
 	loop {
 		try {
 			while (!self->goodRecruitmentTime.isReady()) {
@@ -2882,6 +2911,8 @@ ACTOR Future<Void> handleGetEncryptionAtRestMode(ClusterControllerData* self, Cl
 		TraceEvent("HandleGetEncryptionAtRestModeEnd").detail("TlogId", req.tlogId).detail("Mode", resp.mode);
 	}
 }
+
+using VecOptKey = std::vector<Optional<Key>>;
 
 ACTOR Future<Void> clusterControllerCore(ClusterControllerFullInterface interf,
                                          Future<Void> leaderFail,

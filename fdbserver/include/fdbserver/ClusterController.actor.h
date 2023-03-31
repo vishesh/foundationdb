@@ -24,6 +24,9 @@
 // version.
 #include "fdbclient/StorageServerInterface.h"
 #include "fdbserver/BlobMigratorInterface.h"
+#include "flow/Arena.h"
+#include "flow/network.h"
+#include <memory>
 #include <utility>
 
 #if defined(NO_INTELLISENSE) && !defined(FDBSERVER_CLUSTERCONTROLLER_ACTOR_G_H)
@@ -43,6 +46,32 @@
 #include "metacluster/MetaclusterMetrics.h"
 
 #include "flow/actorcompiler.h" // This must be the last #include.
+
+class ClusterControllerData;
+void updateWorkerHealthSwift(const UpdateWorkerHealthRequest& req, ClusterControllerData* self);
+
+
+inline bool isEqualStandaloneStringRef(const Key& a, const Key& b) {
+	return a == b;
+}
+
+using VecOptKey = std::vector<Optional<Key>>;
+using OptionalKey = Optional<Key>;
+using OptVecOptKey = Optional<VecOptKey>;
+
+// Stores the health information from a particular worker's perspective.
+struct WorkerHealth {
+	struct DegradedTimes {
+		double startTime = 0;
+		double lastRefreshTime = 0;
+	};
+	std::unordered_map<NetworkAddress, WorkerHealth::DegradedTimes> degradedPeers;
+	std::unordered_map<NetworkAddress, DegradedTimes> disconnectedPeers;
+	// TODO(zhewu): Include disk and CPU signals.
+};
+using DegradedTimesMap = std::unordered_map<NetworkAddress, WorkerHealth::DegradedTimes>;
+using NetworkAddressSet = std::unordered_set<NetworkAddress>;
+using NetworkWorkerHealthMap = std::unordered_map<NetworkAddress, WorkerHealth>;
 
 struct WorkerInfo : NonCopyable {
 	Future<Void> watcher;
@@ -125,7 +154,7 @@ struct RecruitRemoteWorkersInfo : ReferenceCounted<RecruitRemoteWorkersInfo> {
 	RecruitRemoteWorkersInfo(RecruitRemoteFromConfigurationRequest const& req) : req(req) {}
 };
 
-class ClusterControllerData {
+class SWIFT_CXX_IMMORTAL_SINGLETON_TYPE ClusterControllerData {
 public:
 	struct DBInfo {
 		Reference<AsyncVar<ClientDBInfo>> clientInfo;
@@ -151,6 +180,8 @@ public:
 		Optional<ClusterName> metaclusterName;
 		Optional<MetaclusterRegistrationEntry> metaclusterRegistration;
 		metacluster::MetaclusterMetrics metaclusterMetrics;
+
+		AsyncTrigger* getForceMasterFailureTrigger() { return &forceMasterFailure; }
 
 		DBInfo()
 		  : clientInfo(new AsyncVar<ClientDBInfo>()), serverInfo(new AsyncVar<ServerDBInfo>()),
@@ -2963,6 +2994,13 @@ public:
 
 	// Updates work health signals in `workerHealth` based on `req`.
 	void updateWorkerHealth(const UpdateWorkerHealthRequest& req) {
+		const bool USE_SWIFT_IMPL = true;
+
+		if (USE_SWIFT_IMPL) {
+			updateWorkerHealthSwift(req, this);
+			return;
+		}
+
 		std::string degradedPeersString;
 		for (int i = 0; i < req.degradedPeers.size(); ++i) {
 			degradedPeersString += (i == 0 ? "" : " ") + req.degradedPeers[i].toString();
@@ -3364,6 +3402,8 @@ public:
 	Optional<Standalone<StringRef>> clusterControllerProcessId;
 	Optional<Standalone<StringRef>> clusterControllerDcId;
 	AsyncVar<Optional<std::vector<Optional<Key>>>> desiredDcIds; // desired DC priorities
+	AsyncVar<Optional<std::vector<Optional<Key>>>>* getDesiredDcIds() { return &desiredDcIds; }
+
 	AsyncVar<std::pair<bool, Optional<std::vector<Optional<Key>>>>>
 	    changingDcIds; // current DC priorities to change first, and whether that is the cluster controller
 	AsyncVar<std::pair<bool, Optional<std::vector<Optional<Key>>>>>
@@ -3411,21 +3451,9 @@ public:
 	AsyncVar<bool> recruitConsistencyScan;
 	Optional<UID> recruitingConsistencyScanID;
 
-	// Stores the health information from a particular worker's perspective.
-	struct WorkerHealth {
-		struct DegradedTimes {
-			double startTime = 0;
-			double lastRefreshTime = 0;
-		};
-		std::unordered_map<NetworkAddress, DegradedTimes> degradedPeers;
-		std::unordered_map<NetworkAddress, DegradedTimes> disconnectedPeers;
-
-		// TODO(zhewu): Include disk and CPU signals.
-	};
-	std::unordered_map<NetworkAddress, WorkerHealth> workerHealth;
+	NetworkWorkerHealthMap workerHealth;
 	DegradationInfo degradationInfo;
-	std::unordered_set<NetworkAddress>
-	    excludedDegradedServers; // The degraded servers to be excluded when assigning workers to roles.
+	NetworkAddressSet excludedDegradedServers; // The degraded servers to be excluded when assigning workers to roles.
 	std::queue<double> recentHealthTriggeredRecoveryTime;
 
 	// Capture cluster's Encryption data at-rest mode; the status is set 'only' at the time of cluster creation.
@@ -3444,6 +3472,24 @@ public:
 	Counter statusRequests;
 
 	Reference<EventCacheHolder> recruitedMasterWorkerEventHolder;
+
+	void updateWorkerHealthDegradedPeer(const NetworkAddress& peer,
+	                                    const NetworkAddress& degradedPeer,
+	                                    WorkerHealth::DegradedTimes dt) {
+		workerHealth[peer].degradedPeers[degradedPeer] = dt;
+	}
+
+	void updateWorkerHealthDisconnectedPeer(const NetworkAddress& peer,
+	                                        const NetworkAddress& disconnectedPeer,
+	                                        WorkerHealth::DegradedTimes dt) {
+		workerHealth[peer].disconnectedPeers[disconnectedPeer] = dt;
+	}
+
+	void insertWorkerHealth(const NetworkAddress& addr) {
+		if (workerHealth.find(addr) == workerHealth.end())
+			workerHealth[addr] = {};
+	}
+
 
 	ClusterControllerData(ClusterControllerFullInterface const& ccInterface,
 	                      LocalityData const& locality,
@@ -3481,6 +3527,27 @@ public:
 		id_worker.clear();
 	}
 };
+
+// #define SWIFT_CXX_REF_CLUSTER_CONTROLLER_DATA   \
+//     __attribute__((swift_attr("import_as_ref")))   \
+//     __attribute__((swift_attr("retain:addrefClusterControllerWrapper")))   \
+//     __attribute__((swift_attr("release:delrefClusterControllerWrapper")))
+
+// struct SWIFT_CXX_REF_CLUSTER_CONTROLLER_DATA ClusterControllerWrapper : public NonCopyable, public
+// ReferenceCounted<ClusterControllerWrapper> {
+//     ClusterControllerWrapper(ClusterControllerData* p): ptr(p) {}
+// 	ClusterControllerData* ptr;
+// };
+
+// // FIXME: Remove once https://github.com/apple/swift/issues/61620 is fixed.
+// inline void addrefClusterControllerWrapper(ClusterControllerWrapper* ptr) {
+//     addref(ptr);
+// }
+
+// // FIXME: Remove once https://github.com/apple/swift/issues/61620 is fixed.
+// inline void delrefClusterControllerWrapper(ClusterControllerWrapper* ptr) {
+//     delref(ptr);
+// }
 
 #include "flow/unactorcompiler.h"
 

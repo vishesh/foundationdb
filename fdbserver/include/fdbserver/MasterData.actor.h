@@ -28,6 +28,7 @@
 #include "fdbserver/Knobs.h"
 #include "fdbserver/MasterInterface.h"
 #include "fdbserver/ResolutionBalancer.actor.h"
+#include "fdbserver/ClusterController.actor.h"
 #include "fdbserver/ServerDBInfo.h"
 #include "flow/ActorCollection.h"
 #include "flow/Trace.h"
@@ -37,6 +38,7 @@
 #ifndef FDBSERVER_FORWARD_DECLARE_SWIFT_APIS
 // Forward declare C++ MasterData type.
 struct MasterData;
+class ClusterControllerData;
 
 #include "SwiftModules/FDBServer"
 #endif

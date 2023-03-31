@@ -57,6 +57,7 @@
 #include "fdbserver/ConflictSet.h"
 #include "fdbserver/CoordinationInterface.h"
 #include "fdbserver/CoroFlow.h"
+#include "fdbserver/ClusterController.actor.h"
 #include "fdbserver/DataDistribution.actor.h"
 #include "fdbserver/FDBExecHelper.actor.h"
 #include "fdbserver/IKeyValueStore.h"

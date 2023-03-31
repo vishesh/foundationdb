@@ -30,6 +30,7 @@ endif()
 
 add_library(fdbserver_swift STATIC
         masterserver.swift
+        clustercontroller.swift
         swift_fdbserver_cxx_swift_value_conformance.swift
         swift_fdbserver_collections.swift
         swift_fdbserver_stream_support.swift

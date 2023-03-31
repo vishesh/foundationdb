@@ -793,8 +793,7 @@ private:
 	V value;
 	Promise<Void> nextChange;
 };
-
-class AsyncTrigger : NonCopyable {
+class SWIFT_CXX_IMMORTAL_SINGLETON_TYPE AsyncTrigger : NonCopyable {
 public:
 	AsyncTrigger() {}
 	AsyncTrigger(AsyncTrigger&& at) : v(std::move(at.v)) {}
