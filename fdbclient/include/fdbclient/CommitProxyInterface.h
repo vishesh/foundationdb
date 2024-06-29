@@ -402,7 +402,7 @@ struct GetKeyServerLocationsRequest {
 	}
 };
 
-struct SWIFT_CXX_IMPORT_OWNED GetRawCommittedVersionReply {
+struct GetRawCommittedVersionReply {
 	constexpr static FileIdentifier file_identifier = 1314732;
 	Optional<UID> debugID;
 	Version version;
@@ -421,7 +421,7 @@ struct SWIFT_CXX_IMPORT_OWNED GetRawCommittedVersionReply {
 	}
 };
 
-struct SWIFT_CXX_IMPORT_OWNED GetRawCommittedVersionRequest {
+struct GetRawCommittedVersionRequest {
 	constexpr static FileIdentifier file_identifier = 12954034;
 	SpanContext spanContext;
 	Optional<UID> debugID;
@@ -440,7 +440,7 @@ struct SWIFT_CXX_IMPORT_OWNED GetRawCommittedVersionRequest {
 	}
 };
 
-struct SWIFT_CXX_IMPORT_OWNED GetStorageServerRejoinInfoReply {
+struct GetStorageServerRejoinInfoReply {
 	constexpr static FileIdentifier file_identifier = 9469225;
 	Version version;
 	Tag tag;

@@ -27,7 +27,7 @@ project(foundationdb
   VERSION 8.0.0
   DESCRIPTION "FoundationDB is a scalable, fault-tolerant, ordered key-value store with full ACID transactions."
   HOMEPAGE_URL "http://www.foundationdb.org/"
-  LANGUAGES C CXX ASM Swift)
+  LANGUAGES C CXX ASM)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
@@ -290,20 +290,17 @@ add_subdirectory(fdbserver)
 add_subdirectory(fdbcli)
 add_subdirectory(contrib/replay)
 if(NOT WIN32)
-  if(NOT FOUNDATIONDB_CROSS_COMPILING) # FIXME(swift): make this work when
-                                       # x-compiling.
+  if (NOT FOUNDATIONDB_CROSS_COMPILING)
     add_subdirectory(fdbmonitor)
   endif()
 endif()
 add_subdirectory(fdbbackup)
 add_subdirectory(tests)
-if(NOT FOUNDATIONDB_CROSS_COMPILING) # FIXME(swift): make this work when
-                                     # x-compiling.
+if (NOT FOUNDATIONDB_CROSS_COMPILING)
   add_subdirectory(flowbench EXCLUDE_FROM_ALL)
 endif()
 if(WITH_PYTHON AND WITH_C_BINDING)
-  if(NOT FOUNDATIONDB_CROSS_COMPILING) # FIXME(swift): make this work when
-                                       # x-compiling.
+  if (NOT FOUNDATIONDB_CROSS_COMPILING)
     add_subdirectory(bindings)
   endif()
 endif()
@@ -329,27 +326,13 @@ endif()
 ###############################################################################
 if(CMAKE_EXPORT_COMPILE_COMMANDS AND WITH_PYTHON)
   add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/compile_commands.json
-    COMMAND
-      $<TARGET_FILE:Python3::Interpreter>
-      ${CMAKE_CURRENT_SOURCE_DIR}/contrib/gen_compile_db.py ARGS -b
-      ${CMAKE_CURRENT_BINARY_DIR} -s ${CMAKE_CURRENT_SOURCE_DIR} -o
-      ${CMAKE_CURRENT_SOURCE_DIR}/compile_commands.json -ninjatool
-      ${CMAKE_MAKE_PROGRAM} ${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/contrib/gen_compile_db.py
-            ${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
-    COMMENT "Build compile commands for IDE")
-  add_custom_target(
-    processed_compile_commands ALL
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/compile_commands.json
-            ${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json)
-
-  # A prebuild target ensures that all actors, Swift-generated headers, and
-  # Swift modules are built.
-  if(WITH_SWIFT)
-    add_custom_target(prebuild_for_ide ALL DEPENDS fdbserver_swift
-                                                   processed_compile_commands)
-  endif()
+	  OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/compile_commands.json
+	  COMMAND $<TARGET_FILE:Python3::Interpreter> ${CMAKE_CURRENT_SOURCE_DIR}/contrib/gen_compile_db.py
+	  ARGS -b ${CMAKE_CURRENT_BINARY_DIR} -s ${CMAKE_CURRENT_SOURCE_DIR} -o ${CMAKE_CURRENT_SOURCE_DIR}/compile_commands.json -ninjatool ${CMAKE_MAKE_PROGRAM} ${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
+	  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/contrib/gen_compile_db.py ${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
+	  COMMENT "Build compile commands for IDE"
+	)
+  add_custom_target(processed_compile_commands ALL DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/compile_commands.json ${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json)
 endif()
 
 ###############################################################################

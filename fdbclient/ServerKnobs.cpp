@@ -602,7 +602,7 @@ void ServerKnobs::initialize(Randomize randomize, ClientKnobs* clientKnobs, IsSi
 	init( ROCKSDB_USE_DIRECT_READS,                             true );
 	init( ROCKSDB_USE_DIRECT_IO_FLUSH_COMPACTION,               true );
 	init( ROCKSDB_MAX_OPEN_FILES,                                 -1 ); // RocksDB default.
-	init( ROCKSDB_USE_POINT_DELETE_FOR_SYSTEM_KEYS,            false ); 
+	init( ROCKSDB_USE_POINT_DELETE_FOR_SYSTEM_KEYS,            false );
 	init( ROCKSDB_CF_RANGE_DELETION_LIMIT,                         0 );
 	init( ROCKSDB_MEMTABLE_MAX_RANGE_DELETIONS,                10000 );
 	init( ROCKSDB_WAIT_ON_CF_FLUSH,                            false );
@@ -1311,12 +1311,6 @@ void ServerKnobs::initialize(Randomize randomize, ClientKnobs* clientKnobs, IsSi
 	init( REST_KMS_STABILITY_CHECK_INTERVAL,                      5.0);
 
 	init( CONSISTENCY_SCAN_ACTIVE_THROTTLE_RATIO,                0.5 ); if( randomize && BUGGIFY ) CONSISTENCY_SCAN_ACTIVE_THROTTLE_RATIO = deterministicRandom()->random01();
-
-
-	init( FLOW_WITH_SWIFT,                                       false);
-#ifndef WITH_SWIFT
-  ASSERT(!FLOW_WITH_SWIFT); // cannot enable FLOW_WITH_SWIFT server knob without compiling Swift
-#endif
 
 	// Drop in-memory state associated with an idempotency id after this many seconds. Once dropped, this id cannot be
 	// expired proactively, but will eventually get cleaned up by the idempotency id cleaner.

@@ -40,19 +40,6 @@ find_package(OpenSSL REQUIRED)
 add_compile_options(-DHAVE_OPENSSL)
 
 ################################################################################
-# Swift Support
-################################################################################
-
-if (WITH_SWIFT)
-  message(DEBUG "Building with Swift")
-  add_definitions(-DWITH_SWIFT)
-  set(WITH_SWIFT ON)
-else()
-  message(DEBUG "Not building with Swift")
-  set(WITH_SWIFT OFF)
-endif()
-
-################################################################################
 # Python Bindings
 ################################################################################
 
@@ -376,7 +363,6 @@ function(print_components)
   message(STATUS "Build Go bindings:                    ${WITH_GO_BINDING}")
   message(STATUS "Build Swift bindings:                 ${WITH_SWIFT_BINDING}")
   message(STATUS "Build Ruby bindings:                  ${WITH_RUBY_BINDING}")
-  message(STATUS "Build Swift (depends on Swift):       ${WITH_SWIFT}")
   message(STATUS "Build Documentation (make html):      ${WITH_DOCUMENTATION}")
   message(STATUS "Build Python sdist (make package):    ${WITH_PYTHON_BINDING}")
   message(STATUS "Configure CTest (depends on Python):  ${WITH_PYTHON}")
