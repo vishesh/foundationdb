@@ -94,6 +94,7 @@ struct StorageServerInterface {
 	LocalityData locality;
 	UID uniqueID;
 	Optional<UID> tssPairID;
+	Optional<NetworkAddress> grpcEndpoint;
 
 	PublicRequestStream<struct GetValueRequest> getValue;
 	PublicRequestStream<struct GetKeyRequest> getKey;
@@ -153,7 +154,7 @@ public:
 		ASSERT_WE_THINK(ar.protocolVersion().hasTSS()); // 7.0
 		ASSERT_WE_THINK(ar.protocolVersion().hasStorageInterfaceReadiness()); // 7.1
 
-		serializer(ar, uniqueID, locality, getValue, tssPairID, acceptingRequests);
+		serializer(ar, uniqueID, locality, getValue, tssPairID, acceptingRequests, grpcEndpoint);
 
 		if (Ar::isDeserializing) {
 			getKey = PublicRequestStream<struct GetKeyRequest>(getValue.getEndpoint().getAdjustedEndpoint(1));

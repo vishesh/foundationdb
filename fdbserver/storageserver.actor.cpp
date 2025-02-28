@@ -61,6 +61,8 @@
 #include "fdbclient/CommitProxyInterface.h"
 #include "fdbclient/DatabaseContext.h"
 #include "fdbclient/FDBTypes.h"
+#include "fdbrpc/FileTransfer.h"
+#include "fdbrpc/FlowGrpc.h"
 #include "fdbclient/KeyBackedTypes.actor.h"
 #include "fdbclient/KeyRangeMap.h"
 #include "fdbclient/NativeAPI.actor.h"
@@ -15094,6 +15096,17 @@ ACTOR Future<Void> rocksdbLogCleaner(std::string folder) {
 	return Void();
 }
 
+Future<Void> registerGrpcServices(const UID& id) {
+	if (GrpcServer::instance() == nullptr || !SERVER_KNOBS->GRPC_FILE_TRANSFER) {
+		return Never();
+	}
+
+	auto services = GrpcServer::ServiceList{ std::make_shared<FileTransferServiceImpl>() };
+	GrpcServer::instance()->registerRoleServices(UID(), services);
+	TraceEvent("SSGrpcFileTransferStart").detail("Address", GrpcServer::instance()->getAddress());
+	return Never();
+}
+
 // for creating a new storage server
 ACTOR Future<Void> storageServer(IKeyValueStore* persistentData,
                                  StorageServerInterface ssi,
@@ -15125,6 +15138,7 @@ ACTOR Future<Void> storageServer(IKeyValueStore* persistentData,
 	self.bulkDumpFolder = joinPath(self.folder, serverBulkDumpFolder);
 	self.bulkLoadFolder = joinPath(self.folder, serverBulkLoadFolder);
 	self.actors.add(rocksdbLogCleaner(folder));
+	self.actors.add(registerGrpcServices(ssi.uniqueID));
 
 	try {
 		wait(self.storage.init());

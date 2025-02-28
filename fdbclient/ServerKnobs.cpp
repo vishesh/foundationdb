@@ -1387,6 +1387,8 @@ void ServerKnobs::initialize(Randomize randomize, ClientKnobs* clientKnobs, IsSi
 
 
 	init( FLOW_WITH_SWIFT,                                       false);
+	init( GRPC_FILE_TRANSFER,                                    false);
+
 #ifndef WITH_SWIFT
   ASSERT(!FLOW_WITH_SWIFT); // cannot enable FLOW_WITH_SWIFT server knob without compiling Swift
 #endif

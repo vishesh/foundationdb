@@ -41,6 +41,7 @@
 #include "flow/IRandom.h"
 #include "flow/Knobs.h"
 #include "flow/NetworkAddress.h"
+#include "fdbrpc/FlowGrpc.h"
 #include "flow/ObjectSerializer.h"
 #include "flow/Platform.h"
 #include "flow/ProtocolVersion.h"
@@ -205,6 +206,7 @@ struct ErrorInfo {
 	const Role& role;
 	UID id;
 	ErrorInfo(Error e, const Role& role, UID id) : error(e), role(role), id(id) {}
+
 	template <class Ar>
 	void serialize(Ar&) {
 		ASSERT(false);
@@ -286,6 +288,15 @@ Future<Void> handleIOErrors(Future<Void> actor, IClosable* store, UID id, Future
 	return handleIOErrors(actor, storeError, id, onClosed);
 }
 
+Future<Void> deregisterGrpcService(const UID& id) {
+#ifdef FLOW_GRPC_ENABLED
+	if (GrpcServer::instance() != nullptr) {
+		return GrpcServer::instance()->deregisterRoleServices(id);
+	}
+#endif
+	return Void();
+}
+
 ACTOR Future<Void> workerHandleErrors(FutureStream<ErrorInfo> errors) {
 	loop choose {
 		when(ErrorInfo _err = waitNext(errors)) {
@@ -302,12 +313,20 @@ ACTOR Future<Void> workerHandleErrors(FutureStream<ErrorInfo> errors) {
 
 			endRole(err.role, err.id, "Error", ok, err.error);
 
+			state std::optional<Error> rethrow = std::nullopt;
 			if (err.error.code() == error_code_please_reboot ||
 			    (err.role == Role::SHARED_TRANSACTION_LOG &&
 			     (err.error.code() == error_code_io_error || err.error.code() == error_code_io_timeout)) ||
 			    (SERVER_KNOBS->STORAGE_SERVER_REBOOT_ON_IO_TIMEOUT && err.role == Role::STORAGE_SERVER &&
-			     err.error.code() == error_code_io_timeout))
-				throw err.error;
+			     err.error.code() == error_code_io_timeout)) {
+				rethrow = err.error;
+			}
+
+			wait(deregisterGrpcService(err.id));
+
+			if (rethrow != std::nullopt) {
+				throw *rethrow;
+			}
 		}
 	}
 }
@@ -1718,6 +1737,39 @@ struct TrackRunningStorage {
 	};
 };
 
+void initStorageInterface(StorageServerInterface& recruited, UID id, LocalityData locality, bool isTss) {
+	recruited.uniqueID = id;
+	recruited.locality = locality;
+	recruited.tssPairID =
+	    isTss ? Optional<UID>(UID()) : Optional<UID>(); // set this here since we use its presence to determine
+	                                                    // whether this server is a tss or not
+	recruited.initEndpoints();
+#ifdef FLOW_GRPC_ENABLED
+	if (GrpcServer::instance() != nullptr) {
+		recruited.grpcEndpoint = GrpcServer::instance()->getAddress();
+	}
+#endif
+
+	DUMPTOKEN(recruited.getValue);
+	DUMPTOKEN(recruited.getKey);
+	DUMPTOKEN(recruited.getKeyValues);
+	DUMPTOKEN(recruited.getMappedKeyValues);
+	DUMPTOKEN(recruited.getShardState);
+	DUMPTOKEN(recruited.waitMetrics);
+	DUMPTOKEN(recruited.splitMetrics);
+	DUMPTOKEN(recruited.getReadHotRanges);
+	DUMPTOKEN(recruited.getRangeSplitPoints);
+	DUMPTOKEN(recruited.getStorageMetrics);
+	DUMPTOKEN(recruited.waitFailure);
+	DUMPTOKEN(recruited.getQueuingMetrics);
+	DUMPTOKEN(recruited.getKeyValueStoreType);
+	DUMPTOKEN(recruited.watchValue);
+	DUMPTOKEN(recruited.getKeyValuesStream);
+	DUMPTOKEN(recruited.changeFeedStream);
+	DUMPTOKEN(recruited.changeFeedPop);
+	DUMPTOKEN(recruited.changeFeedVersionUpdate);
+}
+
 ACTOR Future<Void> storageServerRollbackRebooter(std::set<std::pair<UID, KeyValueStoreType>>* runningStorages,
                                                  std::unordered_map<UID, StorageDiskCleaner>* storageCleaners,
                                                  Future<Void> prevStorageServer,
@@ -1775,32 +1827,7 @@ ACTOR Future<Void> storageServerRollbackRebooter(std::set<std::pair<UID, KeyValu
 		}
 
 		StorageServerInterface recruited;
-		recruited.uniqueID = id;
-		recruited.locality = locality;
-		recruited.tssPairID =
-		    isTss ? Optional<UID>(UID()) : Optional<UID>(); // set this here since we use its presence to determine
-		                                                    // whether this server is a tss or not
-		recruited.initEndpoints();
-
-		DUMPTOKEN(recruited.getValue);
-		DUMPTOKEN(recruited.getKey);
-		DUMPTOKEN(recruited.getKeyValues);
-		DUMPTOKEN(recruited.getMappedKeyValues);
-		DUMPTOKEN(recruited.getShardState);
-		DUMPTOKEN(recruited.waitMetrics);
-		DUMPTOKEN(recruited.splitMetrics);
-		DUMPTOKEN(recruited.getReadHotRanges);
-		DUMPTOKEN(recruited.getRangeSplitPoints);
-		DUMPTOKEN(recruited.getStorageMetrics);
-		DUMPTOKEN(recruited.waitFailure);
-		DUMPTOKEN(recruited.getQueuingMetrics);
-		DUMPTOKEN(recruited.getKeyValueStoreType);
-		DUMPTOKEN(recruited.watchValue);
-		DUMPTOKEN(recruited.getKeyValuesStream);
-		DUMPTOKEN(recruited.changeFeedStream);
-		DUMPTOKEN(recruited.changeFeedPop);
-		DUMPTOKEN(recruited.changeFeedVersionUpdate);
-
+		initStorageInterface(recruited, id, locality, isTss);
 		Future<ErrorOr<Void>> storeError = errorOr(store->getError());
 		prevStorageServer = storageServer(store,
 		                                  recruited,
