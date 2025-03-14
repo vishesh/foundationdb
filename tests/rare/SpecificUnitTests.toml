@@ -12,4 +12,3 @@ runSetup=false
     testName = 'UnitTests'
     maxTestCases = 1
     testsMatching = '/'
-    testsIgnored='/fdbrpc/grpc'
