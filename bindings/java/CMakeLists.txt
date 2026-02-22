@@ -214,12 +214,9 @@ create_javadoc(fdb
                FILES ${JAVA_BINDING_SRCS} ${GENERATED_JAVA_FILES} ${GENERATED_JAVA_DIR}/ApiVersion.java
                VERSION ${FDB_VERSION}
                )
-add_dependencies(fdb_javadoc fdb_java_options) 
+add_dependencies(fdb_javadoc fdb_java_options)
 
-add_custom_target(CopyJavadoc
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_BINARY_DIR}/javadoc/fdb ${CMAKE_CURRENT_BINARY_DIR}/../../documentation/html/javadoc
-)
-add_dependencies(CopyJavadoc fdb_javadoc)
+# CopyJavadoc target removed (documentation directory deleted)
 
 if(NOT OPEN_FOR_IDE)
   set(FAT_JAR_BINARIES "NOTFOUND" CACHE STRING
@@ -443,7 +440,7 @@ if(NOT OPEN_FOR_IDE)
       COMMAND ${Java_JAVA_EXECUTABLE}
       -classpath "${target_jar}:${integration_jar_path}:${JUNIT_CLASSPATH}"
       -Djava.library.path=${CMAKE_BINARY_DIR}/lib
-      org.junit.platform.console.ConsoleLauncher "--details=summary" "--class-path=${integration_jar_path}" "--scan-classpath" 
+      org.junit.platform.console.ConsoleLauncher "--details=summary" "--class-path=${integration_jar_path}" "--scan-classpath"
           "--disable-banner" "-t SupportsExternalClient" "--config=external_client_library=${CMAKE_BINARY_DIR}/bindings/c/libfdb_c_external.so"
       )
 

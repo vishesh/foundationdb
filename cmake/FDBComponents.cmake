@@ -102,18 +102,6 @@ else()
 endif()
 
 ################################################################################
-# Pip
-################################################################################
-
-option(BUILD_DOCUMENTATION "build documentation" ON)
-find_package(Python3 COMPONENTS Interpreter)
-if (WITH_PYTHON AND Python3_Interpreter_FOUND AND BUILD_DOCUMENTATION)
-  set(WITH_DOCUMENTATION ON)
-else()
-  set(WITH_DOCUMENTATION OFF)
-endif()
-
-################################################################################
 # GO
 ################################################################################
 
@@ -285,7 +273,6 @@ function(print_components)
   message(STATUS "Build Java Bindings:                  ${WITH_JAVA_BINDING}")
   message(STATUS "Build Go bindings:                    ${WITH_GO_BINDING}")
   message(STATUS "Build Ruby bindings:                  ${WITH_RUBY_BINDING}")
-  message(STATUS "Build Documentation (make html):      ${WITH_DOCUMENTATION}")
   message(STATUS "Build Python sdist (make package):    ${WITH_PYTHON_BINDING}")
   message(STATUS "Configure CTest (depends on Python):  ${WITH_PYTHON}")
   message(STATUS "Build with RocksDB:                   ${WITH_ROCKSDB}")
@@ -295,7 +282,7 @@ function(print_components)
 endfunction()
 
 if(FORCE_ALL_COMPONENTS)
-  if(NOT WITH_C_BINDING OR NOT WITH_JAVA_BINDING OR NOT WITH_GO_BINDING OR NOT WITH_RUBY_BINDING OR NOT WITH_PYTHON_BINDING OR NOT WITH_DOCUMENTATION)
+  if(NOT WITH_C_BINDING OR NOT WITH_JAVA_BINDING OR NOT WITH_GO_BINDING OR NOT WITH_RUBY_BINDING OR NOT WITH_PYTHON_BINDING)
     print_components()
     message(FATAL_ERROR "FORCE_ALL_COMPONENTS is set but not all dependencies could be found")
   endif()

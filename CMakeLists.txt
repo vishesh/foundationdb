@@ -304,12 +304,7 @@ if(WITH_PYTHON AND WITH_C_BINDING)
     add_subdirectory(bindings)
   endif()
 endif()
-if(WITH_DOCUMENTATION)
-  add_subdirectory(documentation)
-  if(BUILD_JAVA_BINDING AND TARGET CopyJavadoc)
-    add_dependencies(html CopyJavadoc)
-  endif()
-endif()
+# Documentation build removed
 
 if(WIN32)
   add_subdirectory(packaging/msi)
