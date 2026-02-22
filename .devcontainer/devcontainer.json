@@ -12,11 +12,19 @@
   "hostRequirements": {
     "storage": "60gb"
   },
+  "mounts": [
+    "source=ccache,target=/ccache,type=volume"
+  ],
   "containerEnv": {
     "CC": "clang",
     "CXX": "clang++",
-    "BOOST_ROOT": "/opt/boost_1_78_0_clang"
+    "BOOST_ROOT": "/opt/boost_1_78_0_clang",
+    "CCACHE_DIR": "/ccache",
+    "CCACHE_MAXSIZE": "10G",
+    "CCACHE_BASEDIR": "/workspaces",
+    "CCACHE_COMPILERCHECK": "content"
   },
+  "postCreateCommand": "dnf install -y ccache && ccache --set-config=compression=true && ccache --set-config=hash_dir=false",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -25,7 +33,10 @@
       ],
       "settings": {
         "cmake.configureArgs": [
-          "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+          "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+          "-DCMAKE_C_COMPILER_LAUNCHER=ccache",
+          "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache",
+          "-DTARGET_DIR=build_output"
         ]
       }
     }
