@@ -121,36 +121,6 @@ LICENSE_PY = textwrap.dedent(
     """
 ).strip()
 
-LICENSE_RB = textwrap.dedent(
-    """
-    # FoundationDB Ruby API
-    # Copyright (c) 2013-2026 Apple Inc.
-
-    # Permission is hereby granted, free of charge, to any person obtaining a copy
-    # of this software and associated documentation files (the "Software"), to deal
-    # in the Software without restriction, including without limitation the rights
-    # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    # copies of the Software, and to permit persons to whom the Software is
-    # furnished to do so, subject to the following conditions:
-
-    # The above copyright notice and this permission notice shall be included in
-    # all copies or substantial portions of the Software.
-
-    # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    # AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-    # THE SOFTWARE.
-
-    # Documentation for this API can be found at
-    # https://apple.github.io/foundationdb/api-ruby.html
-
-    module FDB
-    """
-).strip()
-
 LICENSE_JAVA = textwrap.dedent(
     """
     /*
@@ -298,32 +268,6 @@ def write_python(file_path: pathlib.Path, options: Iterable[Option]) -> None:
             handle.write("\n".join(lines))
             handle.write("\n}\n\n")
 
-
-def write_ruby(file_path: pathlib.Path, options: Iterable[Option]) -> None:
-    type_map = {
-        ParamType.NoneType: "nil",
-        ParamType.Int: "0",
-        ParamType.String: "''",
-        ParamType.Bytes: "''",
-    }
-    with file_path.open("w", newline="\n") as handle:
-        handle.write(LICENSE_RB + "\n")
-        for scope in Scope:
-            if scope is Scope.ErrorPredicate:
-                continue
-            scoped = [o for o in options if o.scope is scope and not o.hidden]
-            handle.write(f"  @@{scope.name} = {{\n")
-            lines = []
-            for o in scoped:
-                param_desc = "nil" if o.param_desc is None else f"\"{o.param_desc}\""
-                lines.append(
-                    f"    \"{o.name.upper()}\" => [{o.code}, \"{o.comment}\", {type_map[o.param_type]}, {param_desc}],"
-                )
-            handle.write("\n".join(lines))
-            handle.write("\n  }\n\n")
-        handle.write("end\n")
-
-
 def write_java(file_path: pathlib.Path, options: Iterable[Option]) -> None:
     with file_path.open("w", newline="\n") as handle:
         handle.write(LICENSE_JAVA + "\n")
@@ -397,7 +341,6 @@ WRITERS = {
     "c": write_c,
     "cpp": write_cpp,
     "python": write_python,
-    "ruby": write_ruby,
     "java": write_java,
 }
 

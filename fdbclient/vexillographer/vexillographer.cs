@@ -115,7 +115,7 @@ namespace vexillographer
 
         private static void usage()
         {
-            Console.WriteLine("{0} inputFile {{c,cpp,java,ruby,python}} <outputDirectory/outputFile>",
+            Console.WriteLine("{0} inputFile {{c,cpp,java,python}} <outputDirectory/outputFile>",
                 Environment.GetCommandLineArgs()[0]);
         }
 

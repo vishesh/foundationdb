@@ -90,9 +90,6 @@ testers = {
         MAX_API_VERSION,
         types=ALL_TYPES,
     ),
-    "ruby": Tester(
-        "ruby", _absolute_path("ruby/tests/tester.rb"), 2040, 23, MAX_API_VERSION
-    ),
     "java": Tester(
         "java",
         _java_cmd + "StackTester",

@@ -5,7 +5,6 @@ set(VEXILLOGRAPHER_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/fdbclient/vexillographer/cpp.cs
     ${CMAKE_CURRENT_SOURCE_DIR}/fdbclient/vexillographer/java.cs
     ${CMAKE_CURRENT_SOURCE_DIR}/fdbclient/vexillographer/python.cs
-    ${CMAKE_CURRENT_SOURCE_DIR}/fdbclient/vexillographer/ruby.cs
     ${CMAKE_CURRENT_SOURCE_DIR}/fdbclient/vexillographer/vexillographer.cs)
 set(VEXILLOGRAPHER_PY ${CMAKE_CURRENT_SOURCE_DIR}/fdbclient/vexillographer/vexillographer.py)
 

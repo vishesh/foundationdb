@@ -20,7 +20,6 @@ function scripted() {
 
 function run_scripted() {
     scripted python
-    scripted ruby
     scripted java
     scripted java_async
     scripted go
@@ -34,7 +33,6 @@ while `true`; do
     echo "Pass $i"
     i=$((i+1))
     run python
-    run ruby
     run java
     run java_async
     run go

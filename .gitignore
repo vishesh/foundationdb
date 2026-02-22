@@ -31,8 +31,6 @@ bindings/python/fdb/fdb*options.py
 bindings/python/dist/
 bindings/python/setup.py
 bindings/python/MANIFEST
-bindings/ruby/lib/fdboptions.rb
-bindings/ruby/fdb.gemspec
 fdbclient/vexillographer/obj/
 fdbrpc/hgVersion*.h
 fdbrpc/SourceVersion*.h
