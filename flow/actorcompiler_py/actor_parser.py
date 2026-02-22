@@ -351,7 +351,7 @@ class ActorParser:
             tok = self.tokens[i]
             if tok.source_line == 0:
                 raise RuntimeError("Invalid source line (0)")
-            if tok.value in ("ACTOR", "SWIFT_ACTOR", "TEST_CASE"):
+            if tok.value in ("ACTOR", "TEST_CASE"):
                 actor = self.parse_actor(i)
                 end = self._parse_end
                 if classContextStack:
@@ -439,7 +439,7 @@ class ActorParser:
         actor.is_forward_declaration = toSemicolon.length() < heading.length()
         if actor.is_forward_declaration:
             heading = toSemicolon
-            if token.value in ("ACTOR", "SWIFT_ACTOR"):
+            if token.value in ("ACTOR"):
                 self.parse_actorHeading(actor, heading)
             else:
                 token.ensure("ACTOR expected!", lambda _: False)
@@ -448,7 +448,7 @@ class ActorParser:
             body = self.range(heading.end_pos + 1, len(self.tokens)).take_while(
                 lambda t: t.brace_depth > toks.first().brace_depth
             )
-            if token.value in ("ACTOR", "SWIFT_ACTOR"):
+            if token.value in ("ACTOR"):
                 self.parse_actorHeading(actor, heading)
             elif token.value == "TEST_CASE":
                 self.parse_test_caseHeading(actor, heading)
