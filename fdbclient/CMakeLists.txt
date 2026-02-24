@@ -142,9 +142,6 @@ target_include_directories(fdbclient_sampling PUBLIC "${CMAKE_CURRENT_SOURCE_DIR
 add_dependencies(fdbclient_sampling fdboptions)
 target_link_libraries(fdbclient_sampling PUBLIC fdbrpc_sampling msgpack PRIVATE rapidxml)
 target_compile_definitions(fdbclient_sampling PRIVATE -DENABLE_SAMPLING)
-if(WIN32)
-  add_dependencies(fdbclient_sampling_actors fdbclient_actors)
-endif()
 
 add_flow_target(LINK_TEST NAME fdbclientlinktest SRCS LinkTest.cpp)
 target_link_libraries(fdbclientlinktest PRIVATE fdbclient rapidxml) # re-link rapidxml due to private link interface
@@ -159,7 +156,7 @@ if(WITH_AWS_BACKUP)
   target_link_libraries(fdbclient_sampling PUBLIC awssdk_target)
 endif()
 
-if (NOT WIN32 AND NOT OPEN_FOR_IDE)
+if (NOT OPEN_FOR_IDE)
   enable_testing()
   add_test(NAME s3client_test COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/s3client_test.sh ${CMAKE_BINARY_DIR})
   add_test(NAME bulkload_test COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/bulkload_test.sh ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})

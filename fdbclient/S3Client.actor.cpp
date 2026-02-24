@@ -25,10 +25,6 @@
 #include <sstream>
 #include <iomanip>
 
-#ifdef _WIN32
-#include <io.h>
-#endif
-
 #include "fdbclient/S3Client.actor.h"
 #include "flow/IAsyncFile.h"
 #include "flow/Trace.h"

@@ -99,14 +99,7 @@
 #include <sanitizer/lsan_interface.h>
 #endif
 
-#ifdef WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#undef min
-#undef max
-#else
 #include <time.h>
-#endif
 #include "flow/actorcompiler.h" // This must be the last #include.
 
 Reference<WatchMetadata> DatabaseContext::getWatchMetadata(KeyRef key) const {

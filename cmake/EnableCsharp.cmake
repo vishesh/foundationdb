@@ -1,10 +1,3 @@
-if(WIN32)
-  # C# is currently only supported on Windows. On other platforms we find mono
-  # manually
-  enable_language(CSharp)
-  return()
-endif()
-
 find_package(dotnet 9.0)
 if(dotnet_FOUND)
   set(CSHARP_USE_MONO FALSE)

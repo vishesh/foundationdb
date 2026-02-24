@@ -601,11 +601,6 @@ private:
 
 int sf_open(const char* filename, int flags, int convFlags, int mode);
 
-#if defined(_WIN32)
-#include <io.h>
-#define O_CLOEXEC 0
-
-#elif defined(__unixish__)
 #define _open ::open
 #define _read ::read
 #define _write ::write
@@ -618,10 +613,6 @@ int sf_open(const char* filename, int flags, int convFlags, int mode);
 int sf_open(const char* filename, int flags, int convFlags, int mode) {
 	return _open(filename, convFlags, mode);
 }
-
-#else
-#error How do i open a file on a new platform?
-#endif
 
 class SimpleFile : public IAsyncFile, public ReferenceCounted<SimpleFile> {
 public:
@@ -2946,34 +2937,6 @@ void extendConnectionFailures(std::string const& context, double duration) {
 		}
 	}
 }
-
-#if defined(_WIN32)
-
-/* Opening with FILE_SHARE_DELETE lets simulation actually work on windows - previously renames were always failing.
-   FIXME: Use an actual platform abstraction for this stuff!  Is there any reason we can't use underlying net2 for
-   example? */
-
-#include <Windows.h>
-
-int sf_open(const char* filename, int flags, int convFlags, int mode) {
-	HANDLE wh = CreateFile(filename,
-	                       GENERIC_READ | ((flags & IAsyncFile::OPEN_READWRITE) ? GENERIC_WRITE : 0),
-	                       FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-	                       nullptr,
-	                       (flags & IAsyncFile::OPEN_EXCLUSIVE) ? CREATE_NEW
-	                       : (flags & IAsyncFile::OPEN_CREATE)  ? OPEN_ALWAYS
-	                                                            : OPEN_EXISTING,
-	                       FILE_ATTRIBUTE_NORMAL,
-	                       nullptr);
-	int h = -1;
-	if (wh != INVALID_HANDLE_VALUE)
-		h = _open_osfhandle((intptr_t)wh, convFlags);
-	else
-		errno = GetLastError() == ERROR_FILE_NOT_FOUND ? ENOENT : EFAULT;
-	return h;
-}
-
-#endif
 
 // Opens a file for asynchronous I/O
 Future<Reference<class IAsyncFile>> Sim2FileSystem::open(const std::string& filename, int64_t flags, int64_t mode) {

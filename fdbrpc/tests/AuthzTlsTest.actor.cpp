@@ -18,8 +18,6 @@
  * limitations under the License.
  */
 
-#ifndef _WIN32
-
 #include <algorithm>
 #include <array>
 #include <cstring>
@@ -590,13 +588,3 @@ int main(int argc, char** argv) {
 		return SUCCESS;
 	}
 }
-#else // _WIN32
-
-#include <iostream>
-
-int main() {
-	std::cerr << "TLS test is not supported in Windows" << std::endl;
-	return -1;
-}
-
-#endif // _WIN32

@@ -13,9 +13,7 @@ if (USE_UBSAN)
   target_link_options(fdbcli PRIVATE "-rdynamic")
 endif()
 
-if(NOT WIN32)
-  target_link_libraries(fdbcli PRIVATE linenoise)
-endif()
+target_link_libraries(fdbcli PRIVATE linenoise)
 
 if(NOT OPEN_FOR_IDE)
   if(GENERATE_DEBUG_PACKAGES)
@@ -26,7 +24,7 @@ if(NOT OPEN_FOR_IDE)
   endif()
 endif()
 
-if (NOT WIN32 AND NOT OPEN_FOR_IDE)
+if (NOT OPEN_FOR_IDE)
   add_dependencies(fdbcli external_client)
 
   if(NOT USE_ASAN)

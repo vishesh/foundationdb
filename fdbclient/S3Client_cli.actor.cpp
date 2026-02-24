@@ -31,10 +31,6 @@
 #include <fcntl.h>
 #include <filesystem>
 
-#ifdef _WIN32
-#include <io.h>
-#endif
-
 #include <boost/algorithm/hex.hpp>
 #include "fdbclient/BuildFlags.h"
 #include "fdbclient/BackupContainerFileSystem.h"

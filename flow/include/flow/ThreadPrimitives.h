@@ -52,7 +52,6 @@ constexpr size_t MAX_CACHE_LINE_SIZE = 64;
 
 class alignas(MAX_CACHE_LINE_SIZE) ThreadSpinLock {
 public:
-	// #ifdef _WIN32
 	ThreadSpinLock() {
 #if VALGRIND
 		ANNOTATE_RWLOCK_CREATE(this);

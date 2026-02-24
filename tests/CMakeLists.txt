@@ -24,11 +24,7 @@ if(WITH_PYTHON)
   if(OLD_FDBSERVER_BINARY)
     message(STATUS "Use old fdb at ${OLD_FDBSERVER_BINARY}")
   else()
-    if(WIN32)
-      set(fdbserver_location ${CMAKE_BINARY_DIR}/bin/fdbserver.exe)
-    else()
-      set(fdbserver_location ${CMAKE_BINARY_DIR}/bin/fdbserver)
-    endif()
+    set(fdbserver_location ${CMAKE_BINARY_DIR}/bin/fdbserver)
 
     set(OLD_FDBSERVER_BINARY ${fdbserver_location} CACHE FILEPATH "Old fdbserver binary" FORCE)
 
@@ -486,7 +482,7 @@ if(WITH_PYTHON)
 
   verify_testing()
 
-  if(NOT OPEN_FOR_IDE AND NOT WIN32)
+  if(NOT OPEN_FOR_IDE)
     create_correctness_package()
 
     if(USE_VALGRIND)

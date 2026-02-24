@@ -22,13 +22,6 @@
 #define FLOW_FLOW_H
 #pragma once
 
-#ifdef _MSC_VER
-#pragma warning(disable : 4244 4267) // SOMEDAY: Carefully check for integer overflow issues (e.g. size_t to int
-// conversions like this suppresses)
-#pragma warning(disable : 4345)
-#pragma warning(error : 4239)
-#endif
-
 #include <algorithm>
 #include <mutex>
 #include <queue>
@@ -1258,15 +1251,15 @@ auto const& getReplyPromiseStream(Request const& r) {
 	return r.reply;
 }
 
-// Neither of these implementations of REPLY_TYPE() works on both MSVC and g++, so...
+// Different REPLY_TYPE() implementations for g++/clang vs other compilers
 #ifdef __GNUG__
 #define REPLY_TYPE(RequestType) decltype(getReplyPromise(std::declval<RequestType>()).getFuture().getValue())
 // #define REPLY_TYPE(RequestType) decltype( getReplyFuture( std::declval<RequestType>() ).getValue() )
 #else
 template <class T>
 struct ReplyType {
-	// Doing this calculation directly in the return value declaration for PromiseStream<T>::getReply()
-	//   breaks IntelliSense in VS2010; this is a workaround.
+	// Workaround: doing this calculation directly in the return value declaration
+	//   for PromiseStream<T>::getReply() does not work on all compilers.
 	typedef decltype(std::declval<T>().reply.getFuture().getValue()) Type;
 };
 template <class T>
@@ -1366,14 +1359,14 @@ private:
 	NotifiedQueue<T>* queue;
 };
 
-// Neither of these implementations of REPLY_TYPE() works on both MSVC and g++, so...
+// Different REPLY_TYPE() implementations for g++/clang vs other compilers
 #ifdef __GNUG__
 #define REPLYSTREAM_TYPE(RequestType) decltype(getReplyPromiseStream(std::declval<RequestType>()).getFuture().pop())
 #else
 template <class T>
 struct ReplyStreamType {
-	// Doing this calculation directly in the return value declaration for PromiseStream<T>::getReply()
-	//   breaks IntelliSense in VS2010; this is a workaround.
+	// Workaround: doing this calculation directly in the return value declaration
+	//   for PromiseStream<T>::getReply() does not work on all compilers.
 	typedef decltype(std::declval<T>().reply.getFuture().pop()) Type;
 };
 template <class T>

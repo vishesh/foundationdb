@@ -37,9 +37,8 @@ if(USE_ASAN OR USE_VALGRIND OR USE_MSAN OR USE_TSAN OR USE_UBSAN)
 endif()
 
 set(jemalloc_default ON)
-# We don't want to use jemalloc on Windows
 # Nor on FreeBSD, where jemalloc is the default system allocator
-if(USE_SANITIZER OR WIN32 OR (CMAKE_SYSTEM_NAME STREQUAL "FreeBSD") OR APPLE)
+if(USE_SANITIZER OR (CMAKE_SYSTEM_NAME STREQUAL "FreeBSD") OR APPLE)
   set(jemalloc_default OFF)
 endif()
 env_set(USE_JEMALLOC ${jemalloc_default} BOOL "Link with jemalloc")
@@ -70,14 +69,6 @@ add_compile_definitions(BOOST_ERROR_CODE_HEADER_ONLY BOOST_SYSTEM_NO_DEPRECATED)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-if(WIN32)
-  add_definitions(-DBOOST_USE_WINDOWS_H)
-  add_definitions(-DWIN32_LEAN_AND_MEAN)
-  add_definitions(-D_ITERATOR_DEBUG_LEVEL=0)
-  add_definitions(-DNOGDI) # WinGDI.h defines macro ERROR
-  add_definitions(-D_USE_MATH_DEFINES) # Math constants
-endif()
-
 if(APPLE)
 # Remove this after boost 1.81 or above is used
 add_definitions(-D_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION)
@@ -102,27 +93,13 @@ if(NOT OPEN_FOR_IDE)
   add_compile_definitions(NO_INTELLISENSE)
 endif()
 
-if(NOT WIN32)
-  include(CheckIncludeFile)
-  CHECK_INCLUDE_FILE("stdatomic.h" HAS_C11_ATOMICS)
-  if (NOT HAS_C11_ATOMICS)
-    message(FATAL_ERROR "C compiler does not support c11 atomics")
-  endif()
+include(CheckIncludeFile)
+CHECK_INCLUDE_FILE("stdatomic.h" HAS_C11_ATOMICS)
+if (NOT HAS_C11_ATOMICS)
+  message(FATAL_ERROR "C compiler does not support c11 atomics")
 endif()
 
-if(WIN32)
-  # see: https://docs.microsoft.com/en-us/windows/desktop/WinProg/using-the-windows-headers
-  # this sets the windows target version to Windows Server 2003
-  set(WINDOWS_TARGET 0x0502)
-  if(CMAKE_CXX_FLAGS MATCHES "/W[0-4]")
-    # TODO: This doesn't seem to be good style, but I couldn't find a better way so far
-    string(REGEX REPLACE "/W[0-4]" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-  endif()
-  add_compile_options(/W0 /EHsc /bigobj $<$<CONFIG:Release>:/Zi> /MP /FC /Gm-)
-  add_compile_definitions(NOMINMAX)
-  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-else()
-  set(GCC NO)
+set(GCC NO)
   set(CLANG NO)
   set(ICX NO)
   # CMAKE_CXX_COMPILER_ID is set to Clang even if CMAKE_CXX_COMPILER points to ICPX, so we have to check the compiler too.
@@ -561,4 +538,3 @@ else()
       set(CMAKE_CXX_ARCHIVE_FINISH   true)
     endif()
   endif()
-endif()

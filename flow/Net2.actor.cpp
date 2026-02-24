@@ -68,9 +68,6 @@
 #include <sanitizer/lsan_interface.h>
 #endif
 
-#ifdef WIN32
-#include <mmsystem.h>
-#endif
 #include "flow/actorcompiler.h" // This must be the last #include.
 
 // Defined to track the stack limit
@@ -1581,11 +1578,6 @@ void Net2::run() {
 
 	unsigned int tasksSinceReact = 0;
 
-#ifdef WIN32
-	if (timeBeginPeriod(1) != TIMERR_NOERROR)
-		TraceEvent(SevError, "TimeBeginPeriodError").log();
-#endif
-
 	timeOffsetLogger = logTimeOffset();
 	const char* flow_profiler_enabled = getenv("FLOW_PROFILER_ENABLED");
 	if (flow_profiler_enabled != nullptr && *flow_profiler_enabled != '\0') {
@@ -1770,9 +1762,6 @@ void Net2::run() {
 		fn();
 	}
 
-#ifdef WIN32
-	timeEndPeriod(1);
-#endif
 } // Net2::run
 
 // Updates the PriorityStats found in NetworkMetrics

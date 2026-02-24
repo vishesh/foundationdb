@@ -15,11 +15,7 @@ define_property(
 expression in this list will be ignored when the coverage.target.xml file is \
 generated. This property is set through the add_flow_target function.")
 
-if(WIN32)
-  set(compilation_unit_macro_default OFF)
-else()
-  set(compilation_unit_macro_default ON)
-endif()
+set(compilation_unit_macro_default ON)
 
 set(PASS_COMPILATION_UNIT
     "${compilation_unit_macro_default}"
@@ -63,22 +59,11 @@ function(generate_coverage_xml)
   if(type STREQUAL "STATIC_LIBRARY")
     set(target_file ${LIBRARY_OUTPUT_PATH}/coverage.${target_name}.xml)
   elseif(type STREQUAL "SHARED_LIBRARY")
-    if(WIN32)
-      set(target_file ${EXECUTABLE_OUTPUT_PATH}/coverage.${target_name}.xml)
-    else()
-      set(target_file ${LIBRARY_OUTPUT_PATH}/coverage.${target_name}.xml)
-    endif()
+    set(target_file ${LIBRARY_OUTPUT_PATH}/coverage.${target_name}.xml)
   elseif(type STREQUAL "EXECUTABLE")
     set(target_file ${EXECUTABLE_OUTPUT_PATH}/coverage.${target_name}.xml)
   endif()
-  if(WIN32)
-    add_custom_command(
-      OUTPUT ${target_file}
-      COMMAND $<TARGET_FILE:coveragetool> ${target_file} ${in_files}
-      DEPENDS ${in_files}
-      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-      COMMENT "Generate coverage xml")
-  elseif(CSHARP_USE_MONO)
+  if(CSHARP_USE_MONO)
     add_custom_command(
       OUTPUT ${target_file}
       COMMAND ${MONO_EXECUTABLE} ${coveragetool_exe} ${target_file} ${in_files}
@@ -101,9 +86,6 @@ add_custom_target(strip_targets)
 add_dependencies(packages strip_targets)
 
 function(strip_debug_symbols target)
-  if(WIN32)
-    return()
-  endif()
   get_target_property(target_type ${target} TYPE)
   if(target_type STREQUAL "EXECUTABLE")
     set(path ${CMAKE_BINARY_DIR}/packages/bin)

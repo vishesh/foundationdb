@@ -114,8 +114,6 @@ Building FoundationDB requires at least 8GB of memory. More memory is needed whe
 
 1. (Optional) Use tmpfs & ccache for significantly faster repeat builds
 
-1. (Optional) Install a [JDK](https://www.freshports.org/java/openjdk8/) for Java Bindings. FoundationDB currently builds with Java 8.
-
 1. Navigate to the directory where you checked out the FoundationDB repository.
 
 1. Build from source.
@@ -152,23 +150,6 @@ To generate an installable package,
 ```sh
 <FDB_SOURCE_DIR>/packaging/osx/buildpkg.sh . <FDB_SOURCE_DIR>
 ```
-
-### Windows
-
-Under Windows, only Visual Studio with ClangCl is supported
-
-1. Install Visual Studio 2019 (IDE or Build Tools), and enable LLVM support
-1. Install  [CMake 3.24.2](https://cmake.org/download/) or higher
-1. Download [Boost 1.86.0](https://archives.boost.io/release/1.86.0/source/boost_1_86_0.tar.bz2)
-1. Unpack boost to C:\boost, or use `-DBOOST_ROOT=<PATH_TO_BOOST>` with `cmake` if unpacked elsewhere
-1. Install [Python](https://www.python.org/downloads/) if it is not already installed by Visual Studio
-1. (Optional) Install [OpenJDK 11](https://developers.redhat.com/products/openjdk/download) to build Java bindings
-1. (Optional) Install [OpenSSL 3.x](https://slproweb.com/products/Win32OpenSSL.html) to build with TLS support
-1. (Optional) Install [WIX Toolset](https://wixtoolset.org/) to build the Windows installer
-1. `mkdir build && cd build`
-1. `cmake -G "Visual Studio 16 2019" -A x64 -T ClangCl <FDB_SOURCE_DIR>`
-1. `msbuild /p:Configuration=Release foundationdb.sln`
-1. To increase build performance, use `/p:UseMultiToolTask=true` and `/p:CL_MPCount=<NUMBER_OF_PARALLEL_JOBS>` 
 
 ### Language Bindings
 

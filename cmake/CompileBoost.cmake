@@ -137,9 +137,6 @@ function(compile_boost)
 endfunction(compile_boost)
 
 if(USE_SANITIZER)
-  if(WIN32)
-    message(FATAL_ERROR "Sanitizers are not supported on Windows")
-  endif()
   message(STATUS "A sanitizer is enabled, need to build boost from source")
   if (USE_VALGRIND)
     compile_boost(TARGET boost_target BUILD_ARGS valgrind=on
@@ -171,28 +168,6 @@ endif ()
 
 if(BOOST_ROOT)
   list(APPEND BOOST_HINT_PATHS ${BOOST_ROOT})
-endif()
-
-if(WIN32)
-  # Use CONFIG mode to prefer Boost's BoostConfig.cmake over deprecated FindBoost module
-  # This is required for CMake 3.30+ compatibility (policy CMP0167)
-  find_package(Boost 1.86.0 EXACT QUIET COMPONENTS filesystem iostreams serialization system program_options url CONFIG PATHS ${BOOST_HINT_PATHS})
-  add_library(boost_target INTERFACE)
-  target_link_libraries(boost_target INTERFACE Boost::boost Boost::filesystem Boost::iostreams Boost::serialization Boost::system Boost::url)
-  
-  # Add zstd library since boost::iostreams may depend on it
-  find_package(PkgConfig QUIET)
-  if(PkgConfig_FOUND)
-    pkg_check_modules(ZSTD QUIET libzstd)
-    if(ZSTD_FOUND)
-      target_link_libraries(boost_target INTERFACE ${ZSTD_LIBRARIES})
-      target_link_directories(boost_target INTERFACE ${ZSTD_LIBRARY_DIRS})
-    endif()
-  endif()
-
-  add_library(boost_target_program_options INTERFACE)
-  target_link_libraries(boost_target_program_options INTERFACE Boost::boost Boost::program_options)
-  return()
 endif()
 
 find_package(Boost 1.86.0 EXACT QUIET COMPONENTS context filesystem iostreams program_options serialization system url CONFIG PATHS ${BOOST_HINT_PATHS})
@@ -229,8 +204,6 @@ if(Boost_FOUND AND NOT FORCE_BOOST_BUILD)
 
   add_library(boost_target_program_options INTERFACE)
   target_link_libraries(boost_target_program_options INTERFACE Boost::boost Boost::program_options)
-elseif(WIN32)
-  message(FATAL_ERROR "Could not find Boost")
 else()
   if(FORCE_BOOST_BUILD)
     message(STATUS "Compile boost because FORCE_BOOST_BUILD is set")

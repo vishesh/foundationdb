@@ -31,9 +31,6 @@ set(CMAKE_REQUIRED_INCLUDES ${OPENSSL_INCLUDE_DIR})
 #    https://cmake.org/cmake/help/v3.24/module/FindOpenSSL.html
 # Without the flags, OpenSSL is dynamically linked.
 set(OPENSSL_USE_STATIC_LIBS TRUE)
-if (WIN32)
-  set(OPENSSL_MSVC_STATIC_RT ON)
-endif()
 # SSL requires ZLIB
 find_package(ZLIB REQUIRED)
 find_package(OpenSSL REQUIRED)
@@ -78,30 +75,6 @@ else()
 endif()
 
 ################################################################################
-# Java Bindings
-################################################################################
-
-option(BUILD_JAVA_BINDING "build java binding" ON)
-if(BUILD_JAVA_BINDING AND NOT WITH_C_BINDING)
-  message(WARNING "Java binding depends on C binding, but C binding is not enabled")
-endif()
-if(NOT BUILD_JAVA_BINDING OR NOT WITH_C_BINDING)
-  set(WITH_JAVA_BINDING OFF)
-else()
-  set(WITH_JAVA_BINDING OFF)
-  find_package(JNI 1.8)
-  find_package(Java 1.8 COMPONENTS Development)
-  # leave FreeBSD JVM compat for later
-  if(JNI_FOUND AND Java_FOUND AND Java_Development_FOUND AND NOT (CMAKE_SYSTEM_NAME STREQUAL "FreeBSD") AND WITH_C_BINDING)
-    set(WITH_JAVA_BINDING ON)
-    include(UseJava)
-    enable_language(Java)
-  else()
-    set(WITH_JAVA_BINDING OFF)
-  endif()
-endif()
-
-################################################################################
 # GO
 ################################################################################
 
@@ -113,8 +86,7 @@ if(NOT BUILD_GO_BINDING OR NOT BUILD_C_BINDING)
   set(WITH_GO_BINDING OFF)
 else()
   find_program(GO_EXECUTABLE go HINTS /usr/local/go/bin/)
-  # building the go binaries is currently not supported on Windows
-  if(GO_EXECUTABLE AND NOT WIN32 AND WITH_C_BINDING)
+  if(GO_EXECUTABLE AND WITH_C_BINDING)
     set(WITH_GO_BINDING ON)
   else()
     set(WITH_GO_BINDING OFF)
@@ -170,10 +142,7 @@ endif()
 ################################################################################
 
 set(DEFAULT_COROUTINE_IMPL boost)
-if(WIN32)
-  # boost coroutine not available in windows build environment for now.
-  set(DEFAULT_COROUTINE_IMPL libcoro)
-elseif(NOT APPLE AND NOT USE_ASAN AND CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^x86")
+if(NOT APPLE AND NOT USE_ASAN AND CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^x86")
   # revert to libcoro for x86 linux while we investigate a performance regression
   set(DEFAULT_COROUTINE_IMPL libcoro)
 endif()
@@ -251,7 +220,6 @@ function(print_components)
   message(STATUS "Build Bindings (depends on Python):   ${WITH_PYTHON}")
   message(STATUS "Build C Bindings:                     ${WITH_C_BINDING}")
   message(STATUS "Build Python Bindings:                ${WITH_PYTHON_BINDING}")
-  message(STATUS "Build Java Bindings:                  ${WITH_JAVA_BINDING}")
   message(STATUS "Build Go bindings:                    ${WITH_GO_BINDING}")
   message(STATUS "Build Python sdist (make package):    ${WITH_PYTHON_BINDING}")
   message(STATUS "Configure CTest (depends on Python):  ${WITH_PYTHON}")
@@ -262,7 +230,7 @@ function(print_components)
 endfunction()
 
 if(FORCE_ALL_COMPONENTS)
-  if(NOT WITH_C_BINDING OR NOT WITH_JAVA_BINDING OR NOT WITH_GO_BINDING OR NOT WITH_PYTHON_BINDING)
+  if(NOT WITH_C_BINDING OR NOT WITH_GO_BINDING OR NOT WITH_PYTHON_BINDING)
     print_components()
     message(FATAL_ERROR "FORCE_ALL_COMPONENTS is set but not all dependencies could be found")
   endif()

@@ -6,20 +6,7 @@ set(COVERAGETOOL_SRCS
 
 set(coveragetool_command "")
 
-if(WIN32)
-  add_executable(coveragetool ${COVERAGETOOL_SRCS})
-  target_compile_options(coveragetool PRIVATE "/langversion:6")
-  set_property(
-    TARGET coveragetool
-    PROPERTY VS_DOTNET_REFERENCES
-             "System"
-             "System.Core"
-             "System.Xml.Linq"
-             "System.Data.DataSetExtensions"
-             "Microsoft.CSharp"
-             "System.Data"
-             "System.Xml")
-elseif(CSHARP_USE_MONO)
+if(CSHARP_USE_MONO)
   set(COVERAGETOOL_COMPILER_REFERENCES
       "-r:System,System.Core,System.Xml.Linq,System.Data.DataSetExtensions,Microsoft.CSharp,System.Data,System.Xml"
   )

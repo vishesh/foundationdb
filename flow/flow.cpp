@@ -260,14 +260,6 @@ int vsformat(std::string& outputString, const char* form, va_list args) {
 		return size;
 	}
 
-#ifdef _WIN32
-	// Microsoft's non-standard vsnprintf doesn't return a correct size, but just an error, so determine the necessary
-	// size
-	va_copy(args2, args);
-	size = _vscprintf(form, args2);
-	va_end(args2);
-#endif
-
 	if (size < 0) {
 		return -1;
 	}

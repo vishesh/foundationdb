@@ -26,12 +26,6 @@
 #include <string.h>
 #include <stdio.h>
 
-#ifdef _WIN32
-#include <windows.h>
-#undef min
-#undef max
-#endif
-
 extern std::string format(const char* form, ...);
 
 Event::Event() = default;

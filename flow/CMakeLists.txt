@@ -71,8 +71,6 @@ set(FDB_PROTOCOL_VERSION_FILE
     CACHE STRING "Protocol version cmake file." FORCE)
 set(FDB_PROTOCOL_VERSION_HEADER_FILE
     "${CMAKE_CURRENT_BINARY_DIR}/include/flow/ProtocolVersion.h")
-set(FDB_PROTOCOL_VERSION_JAVA_FILE
-    "${CMAKE_CURRENT_BINARY_DIR}/include/flow/ProtocolVersion.java")
 set(FDB_PROTOCOL_VERSION_PYTHON_FILE
     "${CMAKE_CURRENT_BINARY_DIR}/include/flow/protocol_version.py")
 add_custom_command(
@@ -82,11 +80,6 @@ add_custom_command(
     ${CMAKE_CURRENT_SOURCE_DIR}/protocolversion/protocol_version.py --source
     ${FDB_PROTOCOL_VERSION_FILE} --generator cpp --output
     ${FDB_PROTOCOL_VERSION_HEADER_FILE}
-  COMMAND
-    ${PROTOCOL_VERSION_PYTHON_EXECUTABLE}
-    ${CMAKE_CURRENT_SOURCE_DIR}/protocolversion/protocol_version.py --source
-    ${FDB_PROTOCOL_VERSION_FILE} --generator java --output
-    ${FDB_PROTOCOL_VERSION_JAVA_FILE}
   COMMAND
     ${PROTOCOL_VERSION_PYTHON_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/protocolversion/protocol_version.py --source
@@ -144,11 +137,8 @@ foreach(ft flow flow_sampling flowlinktest)
     target_compile_definitions(${ft} PRIVATE WITH_FOLLY_MEMCPY)
   endif()
 
-  if(NOT APPLE AND NOT WIN32)
+  if(NOT APPLE)
     set(FLOW_LIBS ${FLOW_LIBS} rt)
-  elseif(WIN32)
-    target_link_libraries(${ft} PUBLIC winmm.lib)
-    target_link_libraries(${ft} PUBLIC psapi.lib)
   endif()
 
   if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
@@ -189,9 +179,6 @@ endif()
 target_link_libraries(acac PUBLIC flow boost_target_program_options)
 
 target_compile_definitions(flow_sampling PRIVATE -DENABLE_SAMPLING)
-if(WIN32)
-  add_dependencies(flow_sampling_actors flow_actors)
-endif()
 
 if(OPEN_FOR_IDE)
   add_library(mkcert OBJECT MkCertCli.cpp)

@@ -12,9 +12,6 @@ set(os "linux")
 set(cpu "intel")
 if(APPLE)
   set(os "osx")
-elseif(WIN32)
-  set(os "windows")
-  set(asm_file ${CMAKE_CURRENT_BINARY_DIR}/fdb_c.g.asm)
 endif()
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
@@ -89,7 +86,6 @@ if(APPLE)
   add_custom_target(exported_symbols_list DEPENDS ${symbols})
   add_dependencies(fdb_c exported_symbols_list)
   target_link_options(fdb_c PRIVATE "LINKER:-no_weak_exports,-exported_symbols_list,${symbols}")
-elseif(WIN32)
 else()
   if(NOT USE_UBSAN)
     # For ubsan we need to export type information for the vptr check to work.
@@ -102,14 +98,7 @@ target_include_directories(fdb_c PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/foundationdb>)
-if(WIN32)
-  enable_language(ASM_MASM)
-  set_property(SOURCE ${asm_file} PROPERTY LANGUAGE ASM_MASM)
-endif()
-
-# The tests don't build on windows
-if(NOT WIN32)
-  set(MAKO_SRCS
+set(MAKO_SRCS
     test/mako/admin_server.hpp
     test/mako/admin_server.cpp
     test/mako/async.hpp
@@ -390,8 +379,6 @@ if(NOT WIN32)
     endif()
   endif()
 
-endif()
-
 set(cpp_workloads_srcs
   test/workloads/workloads.cpp
   test/workloads/workloads.h
@@ -415,7 +402,7 @@ target_link_libraries(cpp_workloads PUBLIC fdb_c)
 target_include_directories(c_workloads PUBLIC ${CMAKE_SOURCE_DIR}/bindings/c)
 target_link_libraries(c_workloads PUBLIC fdb_c)
 
-if(NOT WIN32 AND NOT APPLE AND NOT OPEN_FOR_IDE)
+if(NOT APPLE AND NOT OPEN_FOR_IDE)
   # Add the -Wl,--undefined-version flag to the linker command to allow
   # undefined symbols in version scripts. Clang 19 doesn't allow this and would
   # complain with "symbol not defined" errors.
@@ -456,7 +443,7 @@ if(OPEN_FOR_IDE)
   target_link_libraries(fdb_c_shim_lib_tester PRIVATE fdb_c_shim SimpleOpt fdb_cpp Threads::Threads)
   target_include_directories(fdb_c_shim_lib_tester PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/foundationdb/ ${CMAKE_SOURCE_DIR}/flow/include)
 
-elseif(NOT WIN32 AND NOT APPLE) # Linux Only
+elseif(NOT APPLE) # Linux Only
 
   set(SHIM_LIB_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
@@ -569,7 +556,7 @@ fdb_install(
   DESTINATION_SUFFIX "/cmake/${targets_export_name}"
   COMPONENT clients)
 
-if(NOT WIN32 AND NOT APPLE) # Linux Only
+if(NOT APPLE) # Linux Only
 
   fdb_install(
     FILES foundationdb/fdb_c_shim.h

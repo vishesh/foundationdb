@@ -35,7 +35,7 @@
 #include <openssl/opensslv.h>
 #include <openssl/rsa.h>
 #include <openssl/x509.h>
-#if OPENSSL_VERSION_NUMBER >= 0x30000000L && !defined(_WIN32)
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
 #define USE_V3_API 1
 #else
 #define USE_V3_API 0

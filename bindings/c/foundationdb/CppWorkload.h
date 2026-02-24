@@ -27,13 +27,7 @@
 #include <memory>
 
 #ifndef DLLEXPORT
-#if defined(_MSC_VER)
-#define DLLEXPORT __declspec(dllexport)
-#elif defined(__GNUG__)
 #define DLLEXPORT __attribute__((visibility("default")))
-#else
-#error Missing symbol export
-#endif
 #endif
 
 typedef struct FDB_future FDBFuture;

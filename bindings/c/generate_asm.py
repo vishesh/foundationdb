@@ -41,22 +41,6 @@ with open(source, "r") as srcfile:
                 functions[func].append(ver)
 
 
-def write_windows_asm(asmfile, functions):
-    asmfile.write(".data\n")
-    for f in functions:
-        asmfile.write("\textern fdb_api_ptr_%s:qword\n" % f)
-
-    asmfile.write("\n.code\n")
-
-    for f in functions:
-        asmfile.write("\n%s proc EXPORT\n" % f)
-        asmfile.write("\tmov r11, qword ptr [fdb_api_ptr_%s]\n" % f)
-        asmfile.write("\tjmp r11\n")
-        asmfile.write("%s endp\n" % f)
-
-    asmfile.write("\nEND\n")
-
-
 def write_unix_asm(asmfile, functions, prefix):
     if cpu != "aarch64" and cpu != "ppc64le":
         asmfile.write(".intel_syntax noprefix\n")
@@ -184,12 +168,8 @@ with open(asm, "w") as asmfile:
             write_unix_asm(asmfile, functions, "")
         elif os == "osx":
             write_unix_asm(asmfile, functions, "_")
-        elif os == "windows":
-            write_windows_asm(asmfile, functions)
 
         for f in functions:
-            if os == "windows":
-                hfile.write('extern "C" ')
             hfile.write("void* fdb_api_ptr_%s = (void*)&fdb_api_ptr_unimpl;\n" % f)
             for v in functions[f]:
                 hfile.write("#define %s_v%d_PREV %s_v%d\n" % (f, v, f, v - 1))

@@ -57,7 +57,7 @@ if (GPERFTOOLS_FOUND)
   target_link_libraries(fdbbackup PRIVATE gperftools)
 endif()
 
-if (NOT WIN32 AND NOT OPEN_FOR_IDE)
+if (NOT OPEN_FOR_IDE)
   enable_testing()
   add_test(NAME dir_backup_tests COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/dir_backup_test.sh ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
   add_test(NAME s3_backup_tests COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/s3_backup_test.sh ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR} --encrypt-at-random)

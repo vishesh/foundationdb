@@ -13,14 +13,7 @@ if(NOT DEFINED FDB_USE_CSHARP_TOOLS)
 endif()
 set(VEXILLOGRAPHER_COMMAND "")
 
-if(WIN32 AND FDB_USE_CSHARP_TOOLS)
-  add_executable(vexillographer ${VEXILLOGRAPHER_SRCS})
-  target_compile_options(vexillographer PRIVATE "/langversion:6")
-  set_property(
-    TARGET vexillographer PROPERTY VS_DOTNET_REFERENCES "System" "System.Core"
-                                   "System.Data" "System.Xml" "System.Xml.Linq")
-  set(VEXILLOGRAPHER_DEPENDS vexillographer)
-elseif(FDB_USE_CSHARP_TOOLS AND CSHARP_TOOLCHAIN_FOUND)
+if(FDB_USE_CSHARP_TOOLS AND CSHARP_TOOLCHAIN_FOUND)
   if(CSHARP_USE_MONO)
     set(VEXILLOGRAPHER_REFERENCES
         "-r:System,System.Core,System.Data,System.Xml,System.Xml.Linq")
@@ -57,16 +50,7 @@ function(vexillographer_compile)
     set(VX_OUTPUT ${VX_OUT})
   endif()
 
-  if(WIN32 AND FDB_USE_CSHARP_TOOLS)
-    add_custom_command(
-      OUTPUT ${VX_OUTPUT}
-      COMMAND $<TARGET_FILE:vexillographer>
-        ${CMAKE_SOURCE_DIR}/fdbclient/vexillographer/fdb.options ${VX_LANG}
-        ${VX_OUT}
-      DEPENDS ${CMAKE_SOURCE_DIR}/fdbclient/vexillographer/fdb.options
-              vexillographer
-      COMMENT "Generate FDBOptions ${VX_LANG} files")
-  elseif(FDB_USE_CSHARP_TOOLS AND CSHARP_TOOLCHAIN_FOUND AND CSHARP_USE_MONO)
+  if(FDB_USE_CSHARP_TOOLS AND CSHARP_TOOLCHAIN_FOUND AND CSHARP_USE_MONO)
     add_custom_command(
       OUTPUT ${VX_OUTPUT}
       COMMAND ${VEXILLOGRAPHER_COMMAND}

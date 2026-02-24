@@ -38,23 +38,7 @@ set(ACTORCOMPILER_COMMAND ${ACTORCOMPILER_PY_COMMAND}
 set(actorcompiler_dependencies actorcompiler_py)
 
 if(FDB_USE_CSHARP_TOOLS AND CSHARP_TOOLCHAIN_FOUND)
-  if(WIN32)
-    add_executable(actorcompiler_csharp ${ACTORCOMPILER_LEGACY_SRCS})
-    target_compile_options(actorcompiler_csharp PRIVATE "/langversion:6")
-    set_property(
-      TARGET actorcompiler_csharp
-      PROPERTY VS_DOTNET_REFERENCES
-               "System"
-               "System.Core"
-               "System.Xml.Linq"
-               "System.Data.DataSetExtensions"
-               "Microsoft.CSharp"
-               "System.Data"
-               "System.Xml")
-    set(ACTORCOMPILER_CSHARP_COMMAND $<TARGET_FILE:actorcompiler_csharp>
-        CACHE INTERNAL "Command to run the C# actor compiler")
-    list(APPEND actorcompiler_dependencies actorcompiler_csharp)
-  elseif(CSHARP_USE_MONO)
+  if(CSHARP_USE_MONO)
     add_custom_command(
       OUTPUT actorcompiler.exe
       COMMAND ${CSHARP_COMPILER_EXECUTABLE} ARGS ${ACTOR_COMPILER_REFERENCES}
