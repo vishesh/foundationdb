@@ -592,16 +592,9 @@ static int asyncDelete(sqlite3_vfs* pVfs, const char* zPath, int dirSync) {
 ** as if it does not exist.
 */
 static int asyncAccess(sqlite3_vfs* pVfs, const char* zPath, int flags, int* pResOut) {
-#ifdef __unixish__
-#ifndef F_OK
 #define F_OK 0
-#endif
-#ifndef R_OK
 #define R_OK 4
-#endif
-#ifndef W_OK
 #define W_OK 2
-#endif
 	int rc; /* access() return code */
 	int eAccess = F_OK; /* Second argument to access() */
 
